@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>$(DEVELOPMENT_LANGUAGE)</string>
+    <!-- ... other existing keys ... -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Noted requires microphone access to transcribe medical conversations.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Noted requires speech recognition to provide accurate medical transcription services.</string>
+</dict>
+</plist>

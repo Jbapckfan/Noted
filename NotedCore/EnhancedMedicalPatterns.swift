@@ -1,0 +1,200 @@
+// Enhanced Medical Synonym Patterns
+// Generated: 2025-09-01 20:13:51 +0000
+// Total Patterns: 159
+//
+// These patterns provide comprehensive medical synonym mappings
+// to ensure colloquial terms are properly translated to medical terminology
+
+import Foundation
+
+extension PretrainedMedicalPatterns {
+    /// Enhanced synonym patterns for better coverage
+    static let enhancedPatterns: [String: String] = [
+        "a little": "mild",
+        "advil": "Ibuprofen (Advil)",
+        "aleve": "Naproxen (Aleve)",
+        "altered": "altered mental status",
+        "ankle": "ankle",
+        "antibiotics": "antibiotics",
+        "arm": "upper extremity",
+        "aspirin": "Aspirin",
+        "awful": "severe",
+        "back": "dorsal region",
+        "barfing": "vomiting",
+        "bearable": "tolerable",
+        "belly": "abdomen",
+        "belly hurts": "abdominal pain",
+        "belly pain": "abdominal pain",
+        "benadryl": "Diphenhydramine (Benadryl)",
+        "blacked out": "syncope",
+        "bloated": "distension",
+        "blood pressure meds": "antihypertensive medications",
+        "blood thinner": "anticoagulant",
+        "breathing problems": "respiratory distress",
+        "burning up": "febrile",
+        "can't breathe": "dyspnea",
+        "can't catch breath": "air hunger",
+        "can't move": "profound weakness",
+        "can't stand it": "severe pain",
+        "can't think straight": "cognitive dysfunction",
+        "chest": "thoracic region",
+        "chest discomfort": "chest discomfort",
+        "chest hurts": "chest pain",
+        "chest pain": "Chest Pain",
+        "chest pressure": "chest pressure sensation",
+        "chest tightness": "chest tightness",
+        "chills": "chills",
+        "collapsed": "syncope",
+        "collapsing": "syncope",
+        "confused": "confusion",
+        "couple days ago": "2-3 days ago",
+        "couple weeks": "2 weeks ago",
+        "cramps": "abdominal cramping",
+        "crushing feeling": "crushing chest pain",
+        "disoriented": "disorientation",
+        "dizzy": "dizziness",
+        "dropped": "syncope episode",
+        "enlarged": "swelling",
+        "excruciating": "severe pain",
+        "exhausted": "severe fatigue",
+        "fainted": "syncope",
+        "fainting": "syncope",
+        "falling out": "syncope",
+        "febrile": "febrile",
+        "feel like vomiting": "nausea",
+        "feeling faint": "pre-syncope",
+        "fell out": "syncope",
+        "fever": "Fever",
+        "few days ago": "3-4 days ago",
+        "foggy": "mental fog",
+        "foot": "pedal region",
+        "forgetful": "memory deficit",
+        "gasping": "respiratory distress",
+        "getting sick": "vomiting",
+        "going to be sick": "nausea",
+        "gradual": "insidious onset",
+        "gut pain": "abdominal pain",
+        "hand": "hand",
+        "hard to breathe": "difficulty breathing",
+        "head": "cranial region",
+        "head hurts": "headache",
+        "head pain": "cephalgia",
+        "headache": "Headache",
+        "heart pain": "cardiac-type chest pain",
+        "heaving": "vomiting",
+        "high temp": "elevated temperature",
+        "hip": "hip region",
+        "horrible": "severe",
+        "hot": "febrile sensation",
+        "insulin": "Insulin",
+        "just started": "acute onset",
+        "killing me": "severe pain",
+        "knee": "knee",
+        "last month": "1 month ago",
+        "last night": "overnight",
+        "last week": "1 week ago",
+        "leg": "lower extremity",
+        "legs gave out": "lower extremity weakness",
+        "light-headed": "lightheadedness",
+        "lightheaded": "lightheadedness",
+        "lost consciousness": "syncope",
+        "lower back": "lumbar region",
+        "manageable": "tolerable",
+        "memory problems": "memory impairment",
+        "migraine": "migraine headache",
+        "mild": "mild severity",
+        "motrin": "Ibuprofen (Motrin)",
+        "nauseous": "nausea",
+        "neck": "cervical region",
+        "night sweats": "nocturnal diaphoresis",
+        "no energy": "fatigue",
+        "no strength": "generalized weakness",
+        "not making sense": "confusion",
+        "off balance": "disequilibrium",
+        "out of breath": "dyspnea on exertion",
+        "pain in chest": "chest pain",
+        "pain meds": "analgesics",
+        "passed out": "syncope",
+        "pepto": "Bismuth subsalicylate (Pepto-Bismol)",
+        "pounding head": "throbbing headache",
+        "puffed up": "edema",
+        "puffy": "edema",
+        "puked": "vomited",
+        "puking": "vomiting",
+        "queasy": "nausea",
+        "really bad": "severe",
+        "recently": "recently",
+        "room spinning": "vertigo",
+        "short of breath": "shortness of breath",
+        "shoulder": "shoulder region",
+        "sick to stomach": "nausea",
+        "slight": "mild",
+        "slowly getting worse": "progressive worsening",
+        "sob": "shortness of breath",
+        "spinning": "vertigo",
+        "splitting headache": "severe headache",
+        "squeezing chest": "squeezing chest pain",
+        "stomach": "epigastric region",
+        "stomach ache": "abdominal pain",
+        "stomach cramps": "abdominal cramping",
+        "stomach hurts": "abdominal pain",
+        "stomach turning": "nausea",
+        "sudden": "acute onset",
+        "sweating": "diaphoresis",
+        "swollen": "swelling",
+        "temperature": "fever",
+        "tension headache": "tension-type headache",
+        "terrible": "severe",
+        "this morning": "earlier today",
+        "threw up": "vomited",
+        "throwing up": "vomiting",
+        "tired": "fatigue",
+        "tossing cookies": "vomiting",
+        "trouble breathing": "difficulty breathing",
+        "tummy": "abdomen",
+        "tummy ache": "abdominal pain",
+        "tums": "Calcium carbonate (Tums)",
+        "tylenol": "Acetaminophen (Tylenol)",
+        "unbearable": "severe pain",
+        "unsteady": "dizziness",
+        "upchucking": "vomiting",
+        "upper back": "thoracic spine",
+        "upset stomach": "nausea",
+        "water pill": "diuretic",
+        "water retention": "edema",
+        "weak": "weakness",
+        "went down": "syncope episode",
+        "winded": "dyspnea",
+        "woozy": "dizziness",
+        "worn out": "fatigue",
+        "worst pain ever": "10/10 severe pain",
+        "yesterday": "1 day ago"
+    ]
+    
+    /// Apply both base and enhanced patterns
+    static func applyWithEnhancements(to text: String) -> String {
+        var improved = text
+        
+        // Apply enhanced patterns first (more specific)
+        let enhancedSorted = enhancedPatterns.sorted { $0.key.count > $1.key.count }
+        for (pattern, replacement) in enhancedSorted {
+            let regex = try? NSRegularExpression(
+                pattern: "\\b\(NSRegularExpression.escapedPattern(for: pattern))\\b",
+                options: .caseInsensitive
+            )
+            
+            if let regex = regex {
+                improved = regex.stringByReplacingMatches(
+                    in: improved,
+                    range: NSRange(improved.startIndex..., in: improved),
+                    withTemplate: replacement
+                )
+            }
+        }
+        
+        // Then apply base patterns
+        improved = apply(to: improved)
+        
+        return improved
+    }
+}

@@ -6,6 +6,18 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D0FE6ADA2E1F3F1F0019CD1F /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = D0FE6AD92E1F3F1F0019CD1F /* WhisperKit */; };
+		D0FE6ADC2E1F3F1F0019CD1F /* whisperkit-cli in Frameworks */ = {isa = PBXBuildFile; productRef = D0FE6ADB2E1F3F1F0019CD1F /* whisperkit-cli */; };
+		D0FE6AE32E1F6F0B0019CD1F /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = D0FE6AE22E1F6F0B0019CD1F /* MLX */; };
+		D0FE6AE52E1F6F0B0019CD1F /* MLXFFT in Frameworks */ = {isa = PBXBuildFile; productRef = D0FE6AE42E1F6F0B0019CD1F /* MLXFFT */; };
+		D0FE6AE72E1F6F0B0019CD1F /* MLXFast in Frameworks */ = {isa = PBXBuildFile; productRef = D0FE6AE62E1F6F0B0019CD1F /* MLXFast */; };
+		D0FE6AE92E1F6F0B0019CD1F /* MLXLinalg in Frameworks */ = {isa = PBXBuildFile; productRef = D0FE6AE82E1F6F0B0019CD1F /* MLXLinalg */; };
+		D0FE6AEB2E1F6F0B0019CD1F /* MLXNN in Frameworks */ = {isa = PBXBuildFile; productRef = D0FE6AEA2E1F6F0B0019CD1F /* MLXNN */; };
+		D0FE6B3C2E20BE760019CD1F /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = D0FE6AED200934970019CD1F /* MLXLLM */; };
+		D0FE6B3D2E20BE760019CD1F /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = D0FE6AEE224348220019CD1F /* MLXLMCommon */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		D037A5C02E1ED2A30015A53E /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -29,9 +41,22 @@
 		D037A5C92E1ED2A30015A53E /* NotedCoreUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NotedCoreUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		D037A5DD2E1ED48E0015A53E /* Exceptions for "NotedCore" folder in "NotedCore" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = D037A5AC2E1ED2A10015A53E /* NotedCore */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		D037A5AF2E1ED2A10015A53E /* NotedCore */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D037A5DD2E1ED48E0015A53E /* Exceptions for "NotedCore" folder in "NotedCore" target */,
+			);
 			path = NotedCore;
 			sourceTree = "<group>";
 		};
@@ -52,6 +77,15 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D0FE6B3D2E20BE760019CD1F /* MLXLMCommon in Frameworks */,
+				D0FE6B3C2E20BE760019CD1F /* MLXLLM in Frameworks */,
+				D0FE6AE32E1F6F0B0019CD1F /* MLX in Frameworks */,
+				D0FE6AE92E1F6F0B0019CD1F /* MLXLinalg in Frameworks */,
+				D0FE6ADA2E1F3F1F0019CD1F /* WhisperKit in Frameworks */,
+				D0FE6ADC2E1F3F1F0019CD1F /* whisperkit-cli in Frameworks */,
+				D0FE6AE72E1F6F0B0019CD1F /* MLXFast in Frameworks */,
+				D0FE6AEB2E1F6F0B0019CD1F /* MLXNN in Frameworks */,
+				D0FE6AE52E1F6F0B0019CD1F /* MLXFFT in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +146,15 @@
 			);
 			name = NotedCore;
 			packageProductDependencies = (
+				D0FE6AD92E1F3F1F0019CD1F /* WhisperKit */,
+				D0FE6ADB2E1F3F1F0019CD1F /* whisperkit-cli */,
+				D0FE6AE22E1F6F0B0019CD1F /* MLX */,
+				D0FE6AE42E1F6F0B0019CD1F /* MLXFFT */,
+				D0FE6AE62E1F6F0B0019CD1F /* MLXFast */,
+				D0FE6AE82E1F6F0B0019CD1F /* MLXLinalg */,
+				D0FE6AEA2E1F6F0B0019CD1F /* MLXNN */,
+				D0FE6AED200934970019CD1F /* MLXLLM */,
+				D0FE6AEE224348220019CD1F /* MLXLMCommon */,
 			);
 			productName = NotedCore;
 			productReference = D037A5AD2E1ED2A10015A53E /* NotedCore.app */;
@@ -195,6 +238,11 @@
 			);
 			mainGroup = D037A5A42E1ED2A10015A53E;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				D0FE6AD82E1F3F1F0019CD1F /* XCRemoteSwiftPackageReference "WhisperKit" */,
+				D0FE6AE12E1F6F0B0019CD1F /* XCRemoteSwiftPackageReference "mlx-swift" */,
+				D0FE6AEC284936340019CD1F /* XCRemoteSwiftPackageReference "mlx-swift-examples" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D037A5AE2E1ED2A10015A53E /* Products */;
 			projectDirPath = "";
@@ -322,12 +370,12 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				SDKROOT = iphoneos;
+				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -380,11 +428,11 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
-				SDKROOT = iphoneos;
+				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -400,6 +448,7 @@
 				DEVELOPMENT_TEAM = 529ZZJHQR4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NotedCore/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -412,6 +461,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jamesalford.NotedCore;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = macosx;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -428,6 +478,7 @@
 				DEVELOPMENT_TEAM = 529ZZJHQR4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NotedCore/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -440,6 +491,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jamesalford.NotedCore;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = macosx;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -454,7 +506,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 529ZZJHQR4;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jamesalford.NotedCoreTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -473,7 +525,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 529ZZJHQR4;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jamesalford.NotedCoreTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -558,6 +610,81 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		D0FE6AD82E1F3F1F0019CD1F /* XCRemoteSwiftPackageReference "WhisperKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/argmaxinc/WhisperKit";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+		D0FE6AE12E1F6F0B0019CD1F /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.25.5;
+			};
+		};
+		D0FE6AEC284936340019CD1F /* XCRemoteSwiftPackageReference "mlx-swift-examples" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift-examples";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D0FE6AD92E1F3F1F0019CD1F /* WhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D0FE6AD82E1F3F1F0019CD1F /* XCRemoteSwiftPackageReference "WhisperKit" */;
+			productName = WhisperKit;
+		};
+		D0FE6ADB2E1F3F1F0019CD1F /* whisperkit-cli */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D0FE6AD82E1F3F1F0019CD1F /* XCRemoteSwiftPackageReference "WhisperKit" */;
+			productName = "whisperkit-cli";
+		};
+		D0FE6AE22E1F6F0B0019CD1F /* MLX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D0FE6AE12E1F6F0B0019CD1F /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLX;
+		};
+		D0FE6AE42E1F6F0B0019CD1F /* MLXFFT */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D0FE6AE12E1F6F0B0019CD1F /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXFFT;
+		};
+		D0FE6AE62E1F6F0B0019CD1F /* MLXFast */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D0FE6AE12E1F6F0B0019CD1F /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXFast;
+		};
+		D0FE6AE82E1F6F0B0019CD1F /* MLXLinalg */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D0FE6AE12E1F6F0B0019CD1F /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXLinalg;
+		};
+		D0FE6AEA2E1F6F0B0019CD1F /* MLXNN */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D0FE6AE12E1F6F0B0019CD1F /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXNN;
+		};
+		D0FE6AED200934970019CD1F /* MLXLLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D0FE6AEC284936340019CD1F /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
+			productName = MLXLLM;
+		};
+		D0FE6AEE224348220019CD1F /* MLXLMCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D0FE6AEC284936340019CD1F /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
+			productName = MLXLMCommon;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D037A5A52E1ED2A10015A53E /* Project object */;
 }

@@ -1,0 +1,756 @@
+import Foundation
+import CoreML
+import CreateML
+import Combine
+import Accelerate
+
+// MARK: - Clinical Intelligence Core with Adaptive Learning
+actor ClinicalIntelligenceCore {
+    
+    // MARK: - AI Models
+    private var diagnosticModel: MLModel?
+    private var treatmentRecommender: MLModel?
+    private var riskStratificationModel: MLModel?
+    private var clinicalPathwayModel: MLModel?
+    private var outcomePredictor: MLModel?
+    
+    // MARK: - Knowledge Systems
+    private let clinicalReasoner = ClinicalReasoner()
+    private let evidenceEngine = EvidenceBasedEngine()
+    private let differentialGenerator = DifferentialDiagnosisEngine()
+    private let treatmentOptimizer = TreatmentOptimizer()
+    private let guidelineChecker = GuidelineComplianceChecker()
+    
+    // MARK: - Learning Components
+    private let adaptiveLearner = AdaptiveLearningSystem()
+    private let feedbackProcessor = FeedbackProcessor()
+    private let outcomeTracker = OutcomeTracker()
+    private let modelUpdater = ModelUpdater()
+    
+    // MARK: - Clinical Databases
+    private let diseaseDatabase = DiseaseDatabase()
+    private let treatmentDatabase = TreatmentDatabase()
+    private let drugFormulary = DrugFormulary()
+    private let labReferenceRanges = LabReferenceDatabase()
+    private let clinicalTrialsDB = ClinicalTrialsDatabase()
+    
+    // MARK: - Decision Support
+    private let alertEngine = ClinicalAlertEngine()
+    private let orderSetGenerator = OrderSetGenerator()
+    private let protocolMatcher = ProtocolMatcher()
+    
+    // MARK: - Analytics
+    private var analytics = ClinicalAnalytics()
+    private let qualityMetrics = QualityMetricsTracker()
+    
+    // MARK: - Configuration
+    struct Configuration {
+        var enableAdaptiveLearning: Bool = true
+        var enableRealTimeAlerts: Bool = true
+        var confidenceThreshold: Double = 0.75
+        var maxDifferentials: Int = 10
+        var enableClinicalTrialMatching: Bool = true
+        var enableQualityTracking: Bool = true
+        var learningRate: Double = 0.001
+        var updateFrequency: TimeInterval = 86400 // Daily
+    }
+    
+    private var configuration: Configuration
+    
+    init(configuration: Configuration = Configuration()) {
+        self.configuration = configuration
+    }
+    
+    // MARK: - Initialization
+    func initialize() async {
+        await loadModels()
+        await initializeKnowledgeSystems()
+        await loadClinicalDatabases()
+        
+        if configuration.enableAdaptiveLearning {
+            await initializeLearningSystem()
+        }
+    }
+    
+    private func loadModels() async {
+        diagnosticModel = try? await loadModel("DiagnosticPredictor")
+        treatmentRecommender = try? await loadModel("TreatmentRecommender")
+        riskStratificationModel = try? await loadModel("RiskStratification")
+        clinicalPathwayModel = try? await loadModel("ClinicalPathways")
+        outcomePredictor = try? await loadModel("OutcomePredictor")
+    }
+    
+    private func loadModel(_ name: String) async throws -> MLModel {
+        guard let url = Bundle.main.url(forResource: name, withExtension: "mlmodelc") else {
+            // If model doesn't exist, create a baseline model
+            return try await createBaselineModel(for: name)
+        }
+        
+        let configuration = MLModelConfiguration()
+        configuration.computeUnits = .all
+        configuration.allowLowPrecisionAccumulationOnGPU = true
+        
+        return try MLModel(contentsOf: url, configuration: configuration)
+    }
+    
+    private func createBaselineModel(for name: String) async throws -> MLModel {
+        // Create baseline models using CreateML
+        switch name {
+        case "DiagnosticPredictor":
+            return try await createDiagnosticModel()
+        case "TreatmentRecommender":
+            return try await createTreatmentModel()
+        case "RiskStratification":
+            return try await createRiskModel()
+        default:
+            throw ClinicalIntelligenceError.modelCreationFailed(name)
+        }
+    }
+    
+    // MARK: - Clinical Analysis
+    func analyze(
+        transcription: String,
+        context: ClinicalContext,
+        encounterType: EncounterType
+    ) async -> ClinicalInsights {
+        
+        // Generate differential diagnosis
+        let differentials = await generateDifferentialDiagnosis(
+            symptoms: context.symptomProfile,
+            entities: context.entities,
+            patientProfile: context.patientProfile
+        )
+        
+        // Risk stratification
+        let riskAssessment = await performRiskStratification(
+            context: context,
+            differentials: differentials
+        )
+        
+        // Treatment recommendations
+        let treatments = await generateTreatmentRecommendations(
+            differentials: differentials,
+            riskAssessment: riskAssessment,
+            patientProfile: context.patientProfile
+        )
+        
+        // Clinical decision support
+        let decisionSupport = await generateDecisionSupport(
+            context: context,
+            differentials: differentials,
+            riskAssessment: riskAssessment
+        )
+        
+        // Quality checks
+        let qualityIssues = await performQualityChecks(
+            context: context,
+            encounterType: encounterType
+        )
+        
+        // Generate alerts if needed
+        let alerts = configuration.enableRealTimeAlerts ? 
+            await generateClinicalAlerts(context: context, riskAssessment: riskAssessment) : []
+        
+        return ClinicalInsights(
+            differentials: differentials,
+            riskAssessment: riskAssessment,
+            treatments: treatments,
+            decisionSupport: decisionSupport,
+            alerts: alerts,
+            qualityIssues: qualityIssues,
+            confidence: calculateInsightConfidence(differentials, riskAssessment, treatments),
+            timestamp: Date()
+        )
+    }
+    
+    // MARK: - Differential Diagnosis
+    private func generateDifferentialDiagnosis(
+        symptoms: SymptomProfile,
+        entities: [MedicalEntity],
+        patientProfile: PatientProfile?
+    ) async -> [DifferentialDiagnosis] {
+        
+        // Use ML model for initial predictions
+        let mlPredictions = await predictWithDiagnosticModel(symptoms, entities)
+        
+        // Apply clinical reasoning
+        let reasonedDifferentials = await clinicalReasoner.generateDifferentials(
+            symptoms: symptoms,
+            entities: entities,
+            patientProfile: patientProfile
+        )
+        
+        // Check evidence base
+        let evidenceBasedDx = await evidenceEngine.findEvidenceBasedDiagnoses(
+            symptoms: symptoms,
+            patientProfile: patientProfile
+        )
+        
+        // Merge and rank differentials
+        let merged = mergeDifferentials(mlPredictions, reasonedDifferentials, evidenceBasedDx)
+        
+        // Apply Bayesian reasoning
+        let bayesianRanked = await applyBayesianReasoning(merged, patientProfile: patientProfile)
+        
+        // Limit to configured maximum
+        return Array(bayesianRanked.prefix(configuration.maxDifferentials))
+    }
+    
+    private func predictWithDiagnosticModel(
+        _ symptoms: SymptomProfile,
+        _ entities: [MedicalEntity]
+    ) async -> [DifferentialDiagnosis] {
+        guard let model = diagnosticModel else { return [] }
+        
+        // Prepare features
+        let features = prepareFeatures(symptoms: symptoms, entities: entities)
+        
+        do {
+            let input = try MLDictionaryFeatureProvider(dictionary: features)
+            let output = try model.prediction(from: input)
+            
+            // Parse predictions
+            if let predictions = output.featureValue(for: "diagnoses")?.multiArrayValue {
+                return parseDiagnosticPredictions(predictions)
+            }
+        } catch {
+            print("Diagnostic model prediction failed: \(error)")
+        }
+        
+        return []
+    }
+    
+    // MARK: - Risk Stratification
+    private func performRiskStratification(
+        context: ClinicalContext,
+        differentials: [DifferentialDiagnosis]
+    ) async -> RiskAssessment {
+        
+        // Calculate risk scores
+        let clinicalRisk = await calculateClinicalRisk(context: context)
+        let diagnosticRisk = calculateDiagnosticRisk(differentials: differentials)
+        
+        // Use ML model for comprehensive risk
+        let mlRisk = await predictRiskWithModel(context: context, differentials: differentials)
+        
+        // Apply clinical decision rules
+        let ruleBasedRisk = await applyRiskStratificationRules(context: context)
+        
+        // Combine risk assessments
+        let overallRisk = combineRiskScores(
+            clinical: clinicalRisk,
+            diagnostic: diagnosticRisk,
+            ml: mlRisk,
+            ruleBased: ruleBasedRisk
+        )
+        
+        // Determine risk category
+        let category = categorizeRisk(overallRisk)
+        
+        // Generate recommendations based on risk
+        let recommendations = await generateRiskBasedRecommendations(category, context: context)
+        
+        return RiskAssessment(
+            overallScore: overallRisk,
+            category: category,
+            clinicalRisk: clinicalRisk,
+            diagnosticRisk: diagnosticRisk,
+            mlRisk: mlRisk,
+            recommendations: recommendations,
+            criticalFindings: identifyCriticalFindings(context: context)
+        )
+    }
+    
+    // MARK: - Treatment Recommendations
+    private func generateTreatmentRecommendations(
+        differentials: [DifferentialDiagnosis],
+        riskAssessment: RiskAssessment,
+        patientProfile: PatientProfile?
+    ) async -> [TreatmentRecommendation] {
+        
+        var recommendations: [TreatmentRecommendation] = []
+        
+        for differential in differentials.prefix(3) { // Top 3 differentials
+            // Get evidence-based treatments
+            let evidenceBasedTx = await evidenceEngine.getTreatments(for: differential.diagnosis)
+            
+            // Use ML model for personalized recommendations
+            let personalizedTx = await predictTreatmentWithModel(
+                diagnosis: differential,
+                patientProfile: patientProfile
+            )
+            
+            // Check drug interactions
+            let safeOptions = await checkDrugInteractions(
+                treatments: evidenceBasedTx + personalizedTx,
+                patientProfile: patientProfile
+            )
+            
+            // Optimize based on patient factors
+            let optimized = await treatmentOptimizer.optimize(
+                treatments: safeOptions,
+                patientProfile: patientProfile,
+                riskAssessment: riskAssessment
+            )
+            
+            recommendations.append(contentsOf: optimized)
+        }
+        
+        // Rank by effectiveness and safety
+        return rankTreatments(recommendations)
+    }
+    
+    // MARK: - Clinical Decision Support
+    private func generateDecisionSupport(
+        context: ClinicalContext,
+        differentials: [DifferentialDiagnosis],
+        riskAssessment: RiskAssessment
+    ) async -> ClinicalDecisionSupport {
+        
+        // Determine required diagnostic tests
+        let diagnosticTests = await determineDiagnosticTests(
+            differentials: differentials,
+            context: context
+        )
+        
+        // Generate order sets
+        let orderSets = await orderSetGenerator.generate(
+            for: differentials.first?.diagnosis,
+            riskLevel: riskAssessment.category
+        )
+        
+        // Check clinical pathways
+        let pathways = await matchClinicalPathways(
+            context: context,
+            differentials: differentials
+        )
+        
+        // Generate care plan
+        let carePlan = await generateCarePlan(
+            context: context,
+            differentials: differentials,
+            riskAssessment: riskAssessment
+        )
+        
+        // Documentation suggestions
+        let docSuggestions = generateDocumentationSuggestions(
+            context: context,
+            differentials: differentials
+        )
+        
+        return ClinicalDecisionSupport(
+            diagnosticTests: diagnosticTests,
+            orderSets: orderSets,
+            pathways: pathways,
+            carePlan: carePlan,
+            documentationSuggestions: docSuggestions,
+            criticalActions: identifyCriticalActions(riskAssessment: riskAssessment)
+        )
+    }
+    
+    // MARK: - Clinical Alerts
+    private func generateClinicalAlerts(
+        context: ClinicalContext,
+        riskAssessment: RiskAssessment
+    ) async -> [ClinicalAlert] {
+        
+        var alerts: [ClinicalAlert] = []
+        
+        // Check for red flags
+        if let redFlags = context.clinicalRelevance?.redFlags, !redFlags.isEmpty {
+            for flag in redFlags {
+                alerts.append(ClinicalAlert(
+                    type: .critical,
+                    title: "Red Flag Identified",
+                    message: flag.description,
+                    actions: flag.recommendedActions,
+                    priority: .immediate
+                ))
+            }
+        }
+        
+        // Check risk level
+        if riskAssessment.category == .critical || riskAssessment.category == .high {
+            alerts.append(ClinicalAlert(
+                type: .warning,
+                title: "High Risk Patient",
+                message: "Risk score: \(riskAssessment.overallScore)",
+                actions: riskAssessment.recommendations,
+                priority: .urgent
+            ))
+        }
+        
+        // Check for drug interactions
+        let interactions = await checkForDrugInteractions(context: context)
+        if !interactions.isEmpty {
+            alerts.append(contentsOf: interactions.map { interaction in
+                ClinicalAlert(
+                    type: .warning,
+                    title: "Drug Interaction",
+                    message: interaction.description,
+                    actions: [interaction.recommendation],
+                    priority: .high
+                )
+            })
+        }
+        
+        // Check clinical guidelines
+        let guidelineViolations = await guidelineChecker.check(context: context)
+        alerts.append(contentsOf: guidelineViolations.map { violation in
+            ClinicalAlert(
+                type: .info,
+                title: "Guideline Recommendation",
+                message: violation.guideline,
+                actions: [violation.recommendation],
+                priority: .medium
+            )
+        })
+        
+        return alerts.sorted { $0.priority.rawValue < $1.priority.rawValue }
+    }
+    
+    // MARK: - Suggestions Generation
+    func generateSuggestions(
+        context: ClinicalContext,
+        insights: ClinicalInsights?
+    ) async -> [ClinicalSuggestion] {
+        
+        var suggestions: [ClinicalSuggestion] = []
+        
+        // Suggest additional questions based on differentials
+        if let insights = insights {
+            let questions = generateDiagnosticQuestions(differentials: insights.differentials)
+            suggestions.append(contentsOf: questions.map { q in
+                ClinicalSuggestion(
+                    type: .diagnosticQuestion,
+                    text: q,
+                    rationale: "To help narrow differential diagnosis",
+                    priority: .medium
+                )
+            })
+        }
+        
+        // Suggest missing documentation elements
+        let missingElements = identifyMissingDocumentation(context: context)
+        suggestions.append(contentsOf: missingElements.map { element in
+            ClinicalSuggestion(
+                type: .documentation,
+                text: "Document \(element)",
+                rationale: "Required for complete clinical record",
+                priority: .low
+            )
+        })
+        
+        // Suggest clinical actions
+        if let relevance = context.clinicalRelevance {
+            suggestions.append(contentsOf: relevance.requiredActions.map { action in
+                ClinicalSuggestion(
+                    type: .clinicalAction,
+                    text: action.description,
+                    rationale: action.rationale,
+                    priority: action.priority
+                )
+            })
+        }
+        
+        return suggestions.sorted { $0.priority.rawValue < $1.priority.rawValue }
+    }
+    
+    // MARK: - Billing Code Generation
+    func generateBillingCodes(
+        context: ClinicalContext,
+        duration: TimeInterval
+    ) async -> BillingCodes {
+        
+        // Determine E&M level
+        let emLevel = calculateEMLevel(
+            context: context,
+            duration: duration
+        )
+        
+        // Extract ICD-10 codes
+        let icd10Codes = await extractICD10Codes(context: context)
+        
+        // Extract CPT codes
+        let cptCodes = await extractCPTCodes(context: context)
+        
+        // Calculate MDM complexity
+        let mdmComplexity = calculateMDMComplexity(context: context)
+        
+        return BillingCodes(
+            emLevel: emLevel,
+            icd10: icd10Codes,
+            cpt: cptCodes,
+            mdmComplexity: mdmComplexity,
+            timeBasedBilling: duration > 1800, // >30 minutes
+            criticalCare: context.clinicalRelevance?.clinicalPriority == .critical
+        )
+    }
+    
+    // MARK: - Adaptive Learning
+    func learnFromSession(
+        session: PipelineSession,
+        report: FinalReport,
+        feedback: ClinicalFeedback?
+    ) async {
+        guard configuration.enableAdaptiveLearning else { return }
+        
+        // Process feedback
+        if let feedback = feedback {
+            await feedbackProcessor.process(feedback, session: session)
+        }
+        
+        // Track outcomes
+        await outcomeTracker.track(
+            predictions: report.diagnostics,
+            actualOutcome: feedback?.actualDiagnosis
+        )
+        
+        // Update learning data
+        await adaptiveLearner.addTrainingExample(
+            input: session,
+            output: report,
+            feedback: feedback
+        )
+        
+        // Check if model update is needed
+        if await shouldUpdateModels() {
+            await updateModels()
+        }
+    }
+    
+    private func shouldUpdateModels() async -> Bool {
+        let lastUpdate = await adaptiveLearner.lastUpdateTime
+        let timeSinceUpdate = Date().timeIntervalSince(lastUpdate)
+        let trainingExamples = await adaptiveLearner.pendingExamples
+        
+        return timeSinceUpdate > configuration.updateFrequency && trainingExamples > 100
+    }
+    
+    private func updateModels() async {
+        // Retrain models with new data
+        let trainingData = await adaptiveLearner.getTrainingData()
+        
+        // Update diagnostic model
+        if let updatedDiagnostic = await retrainModel(diagnosticModel, with: trainingData.diagnostic) {
+            diagnosticModel = updatedDiagnostic
+        }
+        
+        // Update treatment model
+        if let updatedTreatment = await retrainModel(treatmentRecommender, with: trainingData.treatment) {
+            treatmentRecommender = updatedTreatment
+        }
+        
+        // Update risk model
+        if let updatedRisk = await retrainModel(riskStratificationModel, with: trainingData.risk) {
+            riskStratificationModel = updatedRisk
+        }
+        
+        await adaptiveLearner.markUpdateComplete()
+    }
+    
+    func enhanceModels() async {
+        // Perform model enhancement when quality drops
+        await modelUpdater.enhanceAllModels()
+    }
+    
+    // MARK: - Diagnostic Generation
+    func generateDiagnostics(session: PipelineSession) async -> [Diagnostic] {
+        let context = session.clinicalContext
+        
+        // Get top differentials
+        let insights = await analyze(
+            transcription: session.transcriptionBuffer.full.text,
+            context: context,
+            encounterType: session.encounterType
+        )
+        
+        return insights.differentials.map { diff in
+            Diagnostic(
+                diagnosis: diff.diagnosis,
+                icd10Code: diff.icd10Code,
+                confidence: diff.probability,
+                evidence: diff.supportingEvidence,
+                ruledOut: diff.ruledOutReasons
+            )
+        }
+    }
+    
+    // MARK: - Recommendation Generation
+    func generateRecommendations(session: PipelineSession) async -> [Recommendation] {
+        let context = session.clinicalContext
+        
+        var recommendations: [Recommendation] = []
+        
+        // Diagnostic recommendations
+        let diagnosticRecs = await generateDiagnosticRecommendations(context: context)
+        recommendations.append(contentsOf: diagnosticRecs)
+        
+        // Treatment recommendations
+        let treatmentRecs = await generateTreatmentRecommendations(
+            differentials: [],
+            riskAssessment: RiskAssessment.empty,
+            patientProfile: context.patientProfile
+        )
+        recommendations.append(contentsOf: treatmentRecs.map { tx in
+            Recommendation(
+                type: .treatment,
+                description: tx.description,
+                priority: tx.priority,
+                evidence: tx.evidenceLevel
+            )
+        })
+        
+        // Follow-up recommendations
+        let followUpRecs = generateFollowUpRecommendations(context: context)
+        recommendations.append(contentsOf: followUpRecs)
+        
+        return recommendations
+    }
+    
+    // MARK: - Helper Methods
+    private func prepareFeatures(symptoms: SymptomProfile, entities: [MedicalEntity]) -> [String: Any] {
+        var features: [String: Any] = [:]
+        
+        // Symptom features
+        features["symptom_count"] = symptoms.symptoms.count
+        features["max_severity"] = symptoms.overallSeverity
+        features["symptom_names"] = symptoms.symptoms.map { $0.name }
+        
+        // Entity features
+        features["medication_count"] = entities.filter { $0.type == .medication }.count
+        features["procedure_count"] = entities.filter { $0.type == .procedure }.count
+        features["has_red_flags"] = entities.contains { $0.attributes["isRedFlag"] as? Bool ?? false }
+        
+        return features
+    }
+    
+    private func calculateInsightConfidence(
+        _ differentials: [DifferentialDiagnosis],
+        _ risk: RiskAssessment,
+        _ treatments: [TreatmentRecommendation]
+    ) -> Double {
+        let diffConfidence = differentials.first?.probability ?? 0
+        let riskConfidence = risk.overallScore > 0 ? 0.9 : 0.7
+        let treatmentConfidence = treatments.isEmpty ? 0.5 : 0.8
+        
+        return (diffConfidence + riskConfidence + treatmentConfidence) / 3.0
+    }
+}
+
+// MARK: - Supporting Types
+struct ClinicalInsights {
+    let differentials: [DifferentialDiagnosis]
+    let riskAssessment: RiskAssessment
+    let treatments: [TreatmentRecommendation]
+    let decisionSupport: ClinicalDecisionSupport
+    let alerts: [ClinicalAlert]
+    let qualityIssues: [QualityIssue]
+    let confidence: Double
+    let timestamp: Date
+}
+
+struct DifferentialDiagnosis {
+    let diagnosis: String
+    let icd10Code: String?
+    let probability: Double
+    let supportingEvidence: [String]
+    let ruledOutReasons: [String]
+    let clinicalPearls: [String]
+}
+
+struct RiskAssessment {
+    let overallScore: Double
+    let category: RiskCategory
+    let clinicalRisk: Double
+    let diagnosticRisk: Double
+    let mlRisk: Double
+    let recommendations: [String]
+    let criticalFindings: [CriticalFinding]
+    
+    static let empty = RiskAssessment(
+        overallScore: 0,
+        category: .low,
+        clinicalRisk: 0,
+        diagnosticRisk: 0,
+        mlRisk: 0,
+        recommendations: [],
+        criticalFindings: []
+    )
+}
+
+enum RiskCategory {
+    case low, medium, high, critical
+}
+
+struct TreatmentRecommendation {
+    let description: String
+    let medication: String?
+    let dosage: String?
+    let duration: String?
+    let priority: Priority
+    let evidenceLevel: EvidenceLevel
+    let contraindications: [String]
+    let monitoring: [String]
+}
+
+struct ClinicalDecisionSupport {
+    let diagnosticTests: [DiagnosticTest]
+    let orderSets: [OrderSet]
+    let pathways: [ClinicalPathway]
+    let carePlan: CarePlan
+    let documentationSuggestions: [String]
+    let criticalActions: [CriticalAction]
+}
+
+struct ClinicalAlert {
+    let type: AlertType
+    let title: String
+    let message: String
+    let actions: [String]
+    let priority: Priority
+}
+
+enum AlertType {
+    case critical, warning, info
+}
+
+enum Priority: Int {
+    case immediate = 0
+    case urgent = 1
+    case high = 2
+    case medium = 3
+    case low = 4
+}
+
+struct ClinicalSuggestion {
+    let type: SuggestionType
+    let text: String
+    let rationale: String
+    let priority: Priority
+}
+
+enum SuggestionType {
+    case diagnosticQuestion
+    case documentation
+    case clinicalAction
+}
+
+struct BillingCodes {
+    let emLevel: String
+    let icd10: [String]
+    let cpt: [String]
+    let mdmComplexity: MDMComplexity
+    let timeBasedBilling: Bool
+    let criticalCare: Bool
+}
+
+enum MDMComplexity {
+    case straightforward, low, moderate, high
+}
+
+enum ClinicalIntelligenceError: Error {
+    case modelCreationFailed(String)
+    case insufficientData
+    case processingError(String)
+}

@@ -1,0 +1,11 @@
+{
+  "model_name": "Phi-3 Mini 4K Instruct",
+  "model_version": "4bit",
+  "context_length": 4096,
+  "parameters": "3.8B",
+  "quantization": "4bit",
+  "source": "mlx-community/Phi-3-mini-4k-instruct-4bit",
+  "license": "MIT",
+  "intended_use": "Medical note generation",
+  "setup_date": "2025-07-10"
+}

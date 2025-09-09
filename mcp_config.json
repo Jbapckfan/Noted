@@ -1,0 +1,184 @@
+{
+  "mcpServers": {
+    "figma": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-figma"],
+      "env": {
+        "FIGMA_PERSONAL_ACCESS_TOKEN": "${FIGMA_PAT}"
+      },
+      "capabilities": {
+        "design_tokens": true,
+        "component_export": true,
+        "real_time_sync": true
+      }
+    },
+    "f2c": {
+      "command": "npx",
+      "args": ["figma-to-code-mcp"],
+      "config": {
+        "output_format": "swiftui",
+        "responsive": true,
+        "dark_mode_support": true,
+        "accessibility": true
+      }
+    },
+    "magic_ui": {
+      "command": "npx",
+      "args": ["@21st-ai/magic-ui-mcp"],
+      "config": {
+        "framework": "swiftui",
+        "style": "medical_professional",
+        "components": [
+          "patient_cards",
+          "vital_signs",
+          "medical_forms",
+          "charts_graphs"
+        ]
+      }
+    },
+    "blender": {
+      "command": "blender",
+      "args": ["--background", "--python-mcp"],
+      "config": {
+        "models_path": "./3d_models/medical",
+        "export_formats": ["usdz", "glb", "fbx"],
+        "render_engine": "cycles",
+        "quality": "high"
+      }
+    },
+    "vibe_design": {
+      "command": "npx",
+      "args": ["@monday/vibe-mcp"],
+      "config": {
+        "theme": "medical",
+        "colors": {
+          "primary": "#0073E6",
+          "secondary": "#00C875",
+          "danger": "#E2445C",
+          "warning": "#FDAB3D"
+        }
+      }
+    },
+    "xcode_build": {
+      "command": "xcrun",
+      "args": ["xcodebuild-mcp"],
+      "config": {
+        "project": "NotedCore.xcodeproj",
+        "scheme": "NotedCore",
+        "configuration": "Release",
+        "derived_data_path": "./DerivedData",
+        "archive_path": "./Archives"
+      }
+    },
+    "xcode_project_manager": {
+      "command": "xcodeproj",
+      "args": ["--mcp-server"],
+      "config": {
+        "auto_add_files": true,
+        "organize_groups": true,
+        "manage_dependencies": true,
+        "swift_packages": [
+          {
+            "url": "https://github.com/argmaxinc/WhisperKit",
+            "branch": "main"
+          },
+          {
+            "url": "https://github.com/ml-explore/mlx-swift",
+            "version": "0.25.5"
+          }
+        ]
+      }
+    },
+    "unity3d": {
+      "command": "Unity",
+      "args": ["-batchmode", "-mcp-server"],
+      "config": {
+        "project_path": "./Unity/MedicalVisualization",
+        "build_targets": ["iOS", "visionOS"],
+        "vr_support": true,
+        "ar_support": true,
+        "packages": [
+          "com.unity.xr.arkit",
+          "com.unity.xr.openxr",
+          "com.unity.visualscripting"
+        ]
+      }
+    }
+  },
+  "integration": {
+    "auto_sync": true,
+    "sync_interval": 300,
+    "design_to_code_pipeline": {
+      "enabled": true,
+      "steps": [
+        "figma_export",
+        "f2c_conversion",
+        "magic_ui_enhancement",
+        "vibe_styling",
+        "xcode_integration"
+      ]
+    },
+    "3d_pipeline": {
+      "enabled": true,
+      "steps": [
+        "blender_modeling",
+        "unity_import",
+        "ar_setup",
+        "xcode_build"
+      ]
+    },
+    "build_automation": {
+      "enabled": true,
+      "triggers": [
+        "on_commit",
+        "on_pull_request",
+        "scheduled_daily"
+      ],
+      "steps": [
+        "xcode_project_update",
+        "build",
+        "test",
+        "archive"
+      ]
+    }
+  },
+  "medical_features": {
+    "3d_models": {
+      "anatomical": [
+        "heart",
+        "lungs",
+        "brain",
+        "skeleton",
+        "vascular_system"
+      ],
+      "procedures": [
+        "iv_insertion",
+        "intubation",
+        "cpr",
+        "wound_suturing",
+        "injection_sites"
+      ]
+    },
+    "ar_overlays": {
+      "vital_signs": true,
+      "anatomy_labels": true,
+      "medication_info": true,
+      "procedure_guidance": true
+    },
+    "vr_training": {
+      "scenarios": [
+        "emergency_response",
+        "surgical_procedures",
+        "patient_assessment",
+        "medication_administration"
+      ],
+      "haptic_feedback": true,
+      "performance_tracking": true
+    }
+  },
+  "api_keys": {
+    "figma": "${FIGMA_API_KEY}",
+    "unity_cloud": "${UNITY_CLOUD_KEY}",
+    "apple_developer": "${APPLE_DEV_KEY}"
+  }
+}
