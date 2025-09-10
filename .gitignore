@@ -191,4 +191,6 @@ test_*.swift
 debug_*.swift
 Scripts/personal/
 NotedCore.xcodeproj/project.xcworkspace/xcuserdata/
-NotedCore.xcodeproj/xcuserdata/
+NotedCore.xcodeproj/xcuserdata/# Large ML Models
+NotedCore/Models/*.mlx
+NotedCore/Models/*.mlmodel
