@@ -1,13 +1,13 @@
-# Noted - Advanced Medical Transcription & Clinical Intelligence System
+# NotedCore - Professional Medical Scribe iOS App
 
-![Swift](https://img.shields.io/badge/swift-5.9-orange.svg)
-![Platform](https://img.shields.io/badge/platform-iOS%2015%2B%20%7C%20macOS%2012%2B-blue.svg)
-![License](https://img.shields.io/badge/license-Proprietary-red.svg)
-![HIPAA](https://img.shields.io/badge/HIPAA-Compliant-green.svg)
+![Platform](https://img.shields.io/badge/platform-iOS%2016.0%2B-blue)
+![Swift](https://img.shields.io/badge/Swift-5.9-orange)
+![WhisperKit](https://img.shields.io/badge/WhisperKit-Integrated-green)
+![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
 
 ## 🏥 Overview
 
-**Noted** is a state-of-the-art medical transcription and clinical intelligence system that combines advanced speech recognition, natural language processing, and clinical decision support to revolutionize healthcare documentation.
+**NotedCore** is a professional-grade medical scribe application for iOS devices that transforms clinical conversations into structured medical documentation. Built with SwiftUI and powered by on-device AI, it provides real-time transcription, intelligent summarization, and comprehensive clinical documentation support.
 
 ### ✨ Key Features
 
@@ -17,6 +17,15 @@
 - ⚡ **Lightning Fast** - Sub-2 second end-to-end processing
 - 📊 **Scalable** - Distributed processing supporting 50+ concurrent sessions
 - 🤖 **Adaptive Learning** - Continuously improves from clinical feedback
+
+### 🆕 Latest Updates (September 2025)
+
+- ✅ **Apple Intelligence Integration** - On-device AI using Foundation Models (iOS 18+)
+- ✅ **ED Note Format** - Proper emergency department documentation structure
+- ✅ **Progressive Note Building** - Phased documentation matching clinical workflow
+- ✅ **Reassessment Mode** - Quick MDM updates without full documentation
+- ✅ **Medical Accuracy Enhancer** - Automatic correction of drugs, dosages, anatomy
+- ✅ **Smart Sections** - Only includes sections with actual content
 
 ## 🚀 Quick Start
 

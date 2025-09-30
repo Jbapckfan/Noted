@@ -1,0 +1,176 @@
+{
+  "model_name": "openai/whisper-small",
+  "output_dir": "./medical-whisper-finetuned",
+  "data_dir": "../MedicalDatasets",
+
+  "training": {
+    "num_epochs": 15,
+    "batch_size": 8,
+    "gradient_accumulation_steps": 4,
+    "learning_rate": 1e-5,
+    "warmup_steps": 500,
+    "weight_decay": 0.01,
+    "max_grad_norm": 1.0,
+    "early_stopping_patience": 3,
+    "save_total_limit": 3
+  },
+
+  "data": {
+    "max_audio_length": 30,
+    "sampling_rate": 16000,
+    "language": "en",
+    "train_split": 0.7,
+    "validation_split": 0.2,
+    "test_split": 0.1,
+    "augmentation": {
+      "enabled": true,
+      "noise_probability": 0.1,
+      "speed_perturbation": true,
+      "volume_perturbation": true,
+      "background_noise": false
+    }
+  },
+
+  "medical_vocabulary": {
+    "enhance_vocabulary": true,
+    "medical_vocab_size": 8000,
+    "categories": {
+      "drugs": {
+        "enabled": true,
+        "weight": 3.0,
+        "max_terms": 2000
+      },
+      "procedures": {
+        "enabled": true,
+        "weight": 3.5,
+        "max_terms": 1500
+      },
+      "anatomy": {
+        "enabled": true,
+        "weight": 2.5,
+        "max_terms": 1200
+      },
+      "pathology": {
+        "enabled": true,
+        "weight": 3.0,
+        "max_terms": 1800
+      },
+      "measurements": {
+        "enabled": true,
+        "weight": 5.0,
+        "max_terms": 800
+      },
+      "abbreviations": {
+        "enabled": true,
+        "weight": 4.0,
+        "max_terms": 700
+      }
+    }
+  },
+
+  "evaluation": {
+    "eval_steps": 250,
+    "save_steps": 500,
+    "logging_steps": 50,
+    "metric_for_best_model": "medical_wer",
+    "greater_is_better": false,
+    "metrics": {
+      "medical_wer": {
+        "enabled": true,
+        "weight": 0.3
+      },
+      "medical_bleu": {
+        "enabled": true,
+        "weight": 0.2
+      },
+      "medical_term_accuracy": {
+        "enabled": true,
+        "weight": 0.25
+      },
+      "clinical_coherence": {
+        "enabled": true,
+        "weight": 0.15
+      },
+      "dosage_accuracy": {
+        "enabled": true,
+        "weight": 0.1
+      }
+    }
+  },
+
+  "export": {
+    "export_coreml": true,
+    "export_onnx": true,
+    "export_whisperkit": true,
+    "quantization": {
+      "enabled": true,
+      "method": "dynamic",
+      "bits": 8
+    },
+    "optimization": {
+      "enable_metal_performance_shaders": true,
+      "neural_engine_optimization": true,
+      "memory_optimization": true
+    }
+  },
+
+  "hardware": {
+    "use_gpu": true,
+    "mixed_precision": true,
+    "distributed_training": false,
+    "gradient_checkpointing": true,
+    "dataloader_num_workers": 4
+  },
+
+  "logging": {
+    "use_wandb": false,
+    "use_tensorboard": true,
+    "log_level": "INFO",
+    "save_logs": true,
+    "experiment_name": "medical_whisper_v1"
+  },
+
+  "medical_specialties": {
+    "general_medicine": {
+      "enabled": true,
+      "weight": 1.0
+    },
+    "emergency_medicine": {
+      "enabled": true,
+      "weight": 1.2
+    },
+    "cardiology": {
+      "enabled": true,
+      "weight": 1.1
+    },
+    "pulmonology": {
+      "enabled": true,
+      "weight": 1.1
+    },
+    "neurology": {
+      "enabled": true,
+      "weight": 1.1
+    },
+    "gastroenterology": {
+      "enabled": false,
+      "weight": 1.0
+    }
+  },
+
+  "synthetic_data": {
+    "generate_synthetic": true,
+    "synthetic_ratio": 0.3,
+    "tts_engine": "gTTS",
+    "voices": ["en-us-male", "en-us-female"],
+    "noise_types": ["hospital", "clinic", "office"],
+    "conversation_templates": 15
+  },
+
+  "quality_targets": {
+    "minimum_medical_wer": 0.05,
+    "target_medical_accuracy": 0.95,
+    "target_dosage_accuracy": 0.98,
+    "target_procedure_accuracy": 0.93,
+    "target_drug_recognition": 0.96
+  }
+}

@@ -2,6 +2,37 @@ import Foundation
 
 // MARK: - Core Medical Types
 
+// Missing basic enums
+enum Severity: String, Codable {
+    case mild, moderate, severe, critical
+    
+    var numericValue: Double {
+        switch self {
+        case .mild: return 1.0
+        case .moderate: return 2.0
+        case .severe: return 3.0
+        case .critical: return 4.0
+        }
+    }
+}
+
+enum Priority: String, Codable {
+    case low, medium, high, urgent, emergency
+}
+
+struct MedicalEntity: Codable {
+    let text: String
+    let type: String
+    let confidence: Double
+}
+
+struct SymptomDetail: Codable {
+    let name: String
+    let severity: Severity
+    let duration: String?
+    let characteristics: [String]
+}
+
 // MARK: Encounter Types
 enum EncounterType: String, CaseIterable, Codable {
     case emergency = "Emergency"
@@ -15,14 +46,84 @@ enum EncounterType: String, CaseIterable, Codable {
     case general = "General"
 }
 
-enum EncounterPhase: String, Codable {
+enum EncounterPhase: String, Codable, Hashable {
     case initial = "Initial Assessment"
     case ongoing = "Ongoing Care"
     case followup = "Follow-up"
+    case followUp = "FollowUp"  // Different raw value for compatibility
     case discharge = "Discharge"
+    
+    var icon: String {
+        switch self {
+        case .initial: return "stethoscope"
+        case .ongoing: return "waveform.path.ecg"
+        case .followup, .followUp: return "arrow.clockwise"
+        case .discharge: return "checkmark.circle"
+        }
+    }
 }
 
 // MARK: Audio & Transcription
+
+// Local TranscriptionResult type (distinct from WhisperKit's)
+struct LocalTranscriptionResult {
+    let text: String
+    let segments: [TranscriptionSegment]
+    let language: String?
+    let timings: TranscriptionTimings?
+    let confidence: Double
+    let processingTime: Double
+    
+    init(text: String, segments: [TranscriptionSegment] = [], language: String? = nil, timings: TranscriptionTimings? = nil, confidence: Double = 0.0, processingTime: Double = 0.0) {
+        self.text = text
+        self.segments = segments
+        self.language = language
+        self.timings = timings
+        self.confidence = confidence
+        self.processingTime = processingTime
+    }
+}
+
+struct TranscriptionSegment: Identifiable, Codable, Equatable {
+    let id: UUID
+    let text: String
+    let start: Double
+    let end: Double
+    var confidence: Float = 0.5
+    var source: TranscriptionSource = .unknown
+    var speaker: Speaker?
+    var timestamp: Date
+    var isEdited: Bool = false
+    
+    init(id: UUID = UUID(), text: String, start: Double, end: Double, confidence: Float = 0.5, source: TranscriptionSource = .unknown, speaker: Speaker? = nil, timestamp: Date = Date(), isEdited: Bool = false) {
+        self.id = id
+        self.text = text
+        self.start = start
+        self.end = end
+        self.confidence = confidence
+        self.source = source
+        self.speaker = speaker
+        self.timestamp = timestamp
+        self.isEdited = isEdited
+    }
+    
+    enum TranscriptionSource: String, Codable, Equatable {
+        case whisper
+        case appleSpeech
+        case ensemble
+        case unknown
+    }
+}
+
+struct Speaker: Codable, Equatable {
+    let id: String
+    let label: String
+}
+
+struct TranscriptionTimings {
+    let tokensPerSecond: Double?
+    let audioProcessingTime: Double?
+}
 struct AudioBuffer {
     private var buffer: Data
     private let maxSize: Int
@@ -65,33 +166,35 @@ struct CircularAudioBuffer {
 }
 
 struct TranscriptionBuffer {
-    private var transcriptions: [TranscriptionResult] = []
+    private var transcriptions: [LocalTranscriptionResult] = []
     private let maxCount: Int
     
     init(maxCount: Int = 100) {
         self.maxCount = maxCount
     }
     
-    mutating func append(_ result: TranscriptionResult) {
+    mutating func append(_ result: LocalTranscriptionResult) {
         transcriptions.append(result)
         if transcriptions.count > maxCount {
             transcriptions.removeFirst()
         }
     }
     
-    var latest: TranscriptionResult {
-        transcriptions.last ?? TranscriptionResult(text: "", confidence: 0, segments: [], processingTime: 0)
+    var latest: LocalTranscriptionResult {
+        transcriptions.last ?? LocalTranscriptionResult(text: "", segments: [], language: nil, timings: nil, confidence: 0, processingTime: 0)
     }
     
-    var full: TranscriptionResult {
+    var full: LocalTranscriptionResult {
         let combinedText = transcriptions.map { $0.text }.joined(separator: " ")
         let avgConfidence = transcriptions.map { $0.confidence }.reduce(0, +) / Double(max(transcriptions.count, 1))
         let allSegments = transcriptions.flatMap { $0.segments }
         
-        return TranscriptionResult(
+        return LocalTranscriptionResult(
             text: combinedText,
-            confidence: avgConfidence,
             segments: allSegments,
+            language: nil,
+            timings: nil,
+            confidence: avgConfidence,
             processingTime: 0
         )
     }
@@ -130,7 +233,7 @@ enum AllergySeverity: String, Codable {
     case mild, moderate, severe, lifeThreatening
 }
 
-struct VitalSigns {
+struct VitalSigns: Codable {
     let bloodPressure: BloodPressure?
     let heartRate: Int?
     let respiratoryRate: Int?
@@ -142,7 +245,7 @@ struct VitalSigns {
     let timestamp: Date
 }
 
-struct BloodPressure {
+struct BloodPressure: Codable {
     let systolic: Int
     let diastolic: Int
     
@@ -465,7 +568,7 @@ func findAssociatedSymptoms(_ symptom: MedicalEntity, in symptoms: [MedicalEntit
 
 func calculateOverallSeverity(_ symptoms: [SymptomDetail]) -> Double {
     guard !symptoms.isEmpty else { return 0 }
-    return symptoms.map { $0.severity }.reduce(0, +) / Double(symptoms.count)
+    return symptoms.map { $0.severity.numericValue }.reduce(0, +) / Double(symptoms.count)
 }
 
 func identifySymptomClusters(_ symptoms: [SymptomDetail]) -> [SymptomCluster] {
@@ -508,3 +611,172 @@ func analyzeProgression(_ timeline: ClinicalTimeline) -> ProgressionType {
         return .chronic
     }
 }
+
+// MARK: - Patient Management
+
+struct Patient: Identifiable, Codable {
+    let id: UUID
+    let medicalRecordNumber: String
+    let firstName: String
+    let lastName: String
+    let dateOfBirth: Date
+    let gender: String
+    let primaryInsurance: String?
+    let emergencyContact: String?
+    let allergies: [String]
+    let medications: [String]
+    let medicalHistory: [String]
+    let chartLevel: ChartLevel
+    
+    var fullName: String {
+        "\(firstName) \(lastName)"
+    }
+    
+    init(id: UUID = UUID(), medicalRecordNumber: String, firstName: String, lastName: String, dateOfBirth: Date, gender: String, primaryInsurance: String? = nil, emergencyContact: String? = nil, allergies: [String] = [], medications: [String] = [], medicalHistory: [String] = [], chartLevel: ChartLevel) {
+        self.id = id
+        self.medicalRecordNumber = medicalRecordNumber
+        self.firstName = firstName
+        self.lastName = lastName
+        self.dateOfBirth = dateOfBirth
+        self.gender = gender
+        self.primaryInsurance = primaryInsurance
+        self.emergencyContact = emergencyContact
+        self.allergies = allergies
+        self.medications = medications
+        self.medicalHistory = medicalHistory
+        self.chartLevel = chartLevel
+    }
+}
+struct ChartLevel: Codable {
+    let currentLevel: Int
+    let maxLevel: Int
+    let missingElements: [String]
+    let completedElements: [String]
+    
+    var completionPercentage: Double {
+        let total = missingElements.count + completedElements.count
+        guard total > 0 else { return 0 }
+        return Double(completedElements.count) / Double(total)
+    }
+}
+
+struct RevenueOpportunity: Identifiable {
+    let id: UUID
+    let type: OpportunityType
+    let description: String
+    let potentialRevenue: Double
+    let effort: EffortLevel
+    let priority: Priority
+    
+    enum OpportunityType: String, CaseIterable {
+        case documentation = "Documentation Improvement"
+        case coding = "Coding Optimization"
+        case billing = "Billing Enhancement"
+        case compliance = "Compliance Gap"
+    }
+    
+    enum EffortLevel: String, CaseIterable {
+        case low = "Low"
+        case medium = "Medium"
+        case high = "High"
+    }
+}
+// MARK: - Clinical Intelligence
+
+struct ClinicalAlert: Identifiable {
+    let id: UUID
+    let severity: Severity
+    let category: AlertCategory
+    let message: String
+    let timestamp: Date
+    let isAcknowledged: Bool
+    
+    enum AlertCategory: String, CaseIterable {
+        case cardiac = "Cardiac"
+        case respiratory = "Respiratory"
+        case neurologic = "Neurologic"
+        case endocrine = "Endocrine"
+        case diagnostic = "Diagnostic"
+        case medication = "Medication"
+        case preventive = "Preventive"
+        case safety = "Safety"
+    }
+    
+    init(severity: Severity, category: AlertCategory, message: String, isAcknowledged: Bool = false) {
+        self.id = UUID()
+        self.severity = severity
+        self.category = category
+        self.message = message
+        self.timestamp = Date()
+        self.isAcknowledged = isAcknowledged
+    }
+}
+
+struct DetectedProcedure: Identifiable {
+    let id: UUID
+    let name: String
+    let cptCode: String?
+    let confidence: Double
+    let timestamp: Date
+    let context: String
+    let billable: Bool
+    
+    init(name: String, cptCode: String? = nil, confidence: Double, context: String, billable: Bool = true) {
+        self.id = UUID()
+        self.name = name
+        self.cptCode = cptCode
+        self.confidence = confidence
+        self.timestamp = Date()
+        self.context = context
+        self.billable = billable
+    }
+}
+
+struct ShiftMetrics {
+    let totalEncounters: Int
+    let averageEncounterDuration: TimeInterval
+    let transcriptionAccuracy: Double
+    let revenueGenerated: Double
+}
+enum AlertUrgency: String, CaseIterable { case low, medium, high, critical }
+struct PatientStatus { let status: String; let timestamp: Date }
+struct DosageAlert: Identifiable { let id = UUID(); let severity: Severity; let message: String }
+struct ClinicalContext { let patientAge: Int; let allergies: [String]; let conditions: [String]; let medications: [String] }
+struct EncounterSession: Identifiable, Codable {
+    let id: UUID
+    let startTime: Date
+    let patientId: String
+    let transcript: String
+    var currentPhase: EncounterPhase
+    var phases: [EncounterPhaseType: String]
+    var transcriptionSegments: [TranscriptionSegment]
+    var isResumable: Bool
+    var selectedNoteType: NoteType
+    var activeDuration: TimeInterval
+    
+    init(id: UUID = UUID(), startTime: Date = Date(), patientId: String, transcript: String = "", isResumable: Bool = true, selectedNoteType: NoteType = .soap, activeDuration: TimeInterval = 0) {
+        self.id = id
+        self.startTime = startTime
+        self.patientId = patientId
+        self.transcript = transcript
+        self.currentPhase = .initial
+        self.phases = [:]
+        self.transcriptionSegments = []
+        self.isResumable = isResumable
+        self.selectedNoteType = selectedNoteType
+        self.activeDuration = activeDuration
+    }
+}
+enum EncounterPhaseType: String, CaseIterable, Codable, Hashable {
+    case intake, examination, assessment, plan
+    
+    var icon: String {
+        switch self {
+        case .intake: return "person.text.rectangle"
+        case .examination: return "stethoscope"
+        case .assessment: return "brain.head.profile"
+        case .plan: return "list.bullet.clipboard"
+        }
+    }
+}
+    

@@ -26,11 +26,10 @@ final class ProductionMedicalSummarizerService: ObservableObject {
     @Published var wordCount: Int = 0
     
     // MARK: - Private Properties
-    private var phi3Service: Phi3MLXService?
+    // private var phi3Service: Phi3MLXService? // Disabled - not available
     private let redFlagService = MedicalRedFlagService.shared
     private let medicalAnalyzer = EnhancedMedicalAnalyzer()
     private let audioEnhancer = AudioEnhancementService()
-    private let enhancedSummarizer = EnhancedMedicalSummarizerService()
     
     private var sessionStartTime = Date()
     private var transcriptionSegments: [TranscriptionSegment] = []
@@ -38,15 +37,7 @@ final class ProductionMedicalSummarizerService: ObservableObject {
     
     // MARK: - Models
     
-    struct TranscriptionSegment {
-        let id = UUID()
-        let text: String
-        let timestamp: Date
-        let audioQuality: Float
-        let transcriptionConfidence: Float
-        let redFlags: [MedicalRedFlagService.DetectedRedFlag]
-        let medicalContext: EnhancedMedicalAnalyzer.MedicalContext?
-    }
+    // Using TranscriptionSegment from MedicalTypes
     
     struct QualityMetrics {
         var audioSignalToNoise: Float = 0.0
@@ -101,9 +92,9 @@ final class ProductionMedicalSummarizerService: ObservableObject {
         }
     }
     
-    private init() {
+    init() {
         Logger.medicalAIInfo("Initializing Production Medical Summarizer")
-        phi3Service = Phi3MLXService.shared
+        // phi3Service = Phi3MLXService.shared // Disabled - not available
         setupQualityMonitoring()
     }
     
@@ -199,14 +190,13 @@ final class ProductionMedicalSummarizerService: ObservableObject {
         let context = medicalAnalyzer.analyzeTranscription(text)
         
         // Create segment
-        let segment = TranscriptionSegment(
+        var segment = TranscriptionSegment(
+            id: UUID(),
             text: text,
-            timestamp: Date(),
-            audioQuality: audioQuality,
-            transcriptionConfidence: confidence,
-            redFlags: redFlags,
-            medicalContext: context
+            start: 0.0,  // Start time in seconds
+            end: 0.0     // End time in seconds  
         )
+        segment.confidence = confidence
         
         transcriptionSegments.append(segment)
         
@@ -316,53 +306,12 @@ final class ProductionMedicalSummarizerService: ObservableObject {
         finalNote += generateEnhancedAnalysisSection(fullContext)
         finalNote += "\n\n"
         
-        // Section 4: AI-Generated or Template-Based Note
-        statusMessage = "🤖 Generating clinical documentation..."
+        // Section 4: Human‑scribe style documentation (concise, non‑verbatim)
+        statusMessage = "🧑🏽‍⚕️ Creating scribe‑style documentation..."
         progress = 0.6
-        
-        if noteType == .edNote && !encounterID.isEmpty {
-            // Use ED Smart-Summary for ED notes
-            finalNote += "## ED Smart-Summary\n\n"
-            
-            if let phi3Service = phi3Service, phi3Service.modelStatus.isReady {
-                let edSummary = await phi3Service.generateEDSmartSummary(
-                    from: finalTranscription,
-                    encounterID: encounterID,
-                    phase: phase,
-                    customInstructions: customInstructions
-                )
-                finalNote += edSummary
-            } else {
-                // Fallback to local ED summary generation
-                let summaryService = MedicalSummarizerService()
-                await summaryService.generateMedicalNote(
-                    from: finalTranscription,
-                    noteType: noteType,
-                    customInstructions: customInstructions,
-                    encounterID: encounterID,
-                    phase: phase
-                )
-                finalNote += summaryService.generatedNote
-            }
-        } else if let phi3Service = phi3Service, phi3Service.modelStatus.isReady {
-            // Use AI for other note types
-            let aiNote = await phi3Service.generateMedicalNote(
-                from: finalTranscription,
-                noteType: noteType,
-                customInstructions: customInstructions
-            )
-            finalNote += "## AI-Generated Clinical Note\n\n"
-            finalNote += aiNote
-        } else {
-            // Use enhanced template processing
-            let templateNote = generateEnhancedTemplateNote(
-                transcription: finalTranscription,
-                noteType: noteType,
-                context: fullContext
-            )
-            finalNote += "## Clinical Documentation\n\n"
-            finalNote += templateNote
-        }
+        let scribe = ScribeStyleNoteBuilder()
+        let scribeNote = scribe.buildNote(noteType: noteType, context: fullContext, transcription: finalTranscription)
+        finalNote += scribeNote
         
         // Section 5: Quality and Compliance Report
         statusMessage = "✅ Finalizing documentation..."
@@ -424,7 +373,7 @@ final class ProductionMedicalSummarizerService: ObservableObject {
         context: EnhancedMedicalAnalyzer.MedicalContext
     ) -> String {
         
-        let timestamp = Date().formatted(date: .abbreviated, time: .shortened)
+        _ = Date().formatted(date: .abbreviated, time: .shortened)
         
         switch noteType {
         case .edNote:
@@ -532,42 +481,133 @@ final class ProductionMedicalSummarizerService: ObservableObject {
     }
     
     private func buildHPIFromContext(context: EnhancedMedicalAnalyzer.MedicalContext, transcription: String) -> String {
+        return buildIntelligentHPI(context: context, transcription: transcription)
+    }
+    
+    /// Creates an intelligent, human-like HPI with clinical reasoning
+    private func buildIntelligentHPI(context: EnhancedMedicalAnalyzer.MedicalContext, transcription: String) -> String {
         var hpi = ""
+        let text = transcription.lowercased()
         
-        // Start with primary symptom
+        // INTELLIGENT OPENING - Contextual presentation
         if let primarySymptom = context.symptoms.first {
-            hpi += "Patient presents with \(primarySymptom.name)"
+            let symptomName = primarySymptom.name.lowercased()
+            
+            // Vary opening based on clinical context
+            if symptomName.contains("chest") && context.conditions.contains(where: { $0.name.contains("thromboembolism") }) {
+                hpi += "This patient presents with \(primarySymptom.name), a concerning symptom given their clinical background"
+            } else if symptomName.contains("pain") {
+                hpi += "The patient reports \(primarySymptom.name)"
+            } else {
+                hpi += "Patient presents with \(primarySymptom.name)"
+            }
+            
+            // Add duration with medical context
             if let duration = primarySymptom.duration {
-                hpi += " for \(duration)"
+                hpi += " that began \(duration) prior to presentation"
             }
+            
+            // Add character with clinical significance
             if let severity = primarySymptom.severity {
-                hpi += ", described as \(severity)"
+                hpi += ", characterized as \(severity)"
             }
+            
+            // Add location with anatomical precision
             if let location = primarySymptom.location {
-                hpi += " in the \(location)"
+                hpi += " localized to the \(location)"
             }
+            
             hpi += ". "
         }
         
-        // Add timeline events
-        if !context.timeline.isEmpty {
-            let timelineStr = context.timeline.map { $0.event }.joined(separator: ". ")
-            hpi += timelineStr + ". "
+        // CLINICAL DETAILS - Add medical reasoning
+        var clinicalDetails: [String] = []
+        
+        // Radiation patterns with significance
+        if text.contains("radiates") || text.contains("goes to") {
+            if text.contains("arm") || text.contains("jaw") {
+                clinicalDetails.append("The pain radiates to the arm and jaw, a pattern that raises concern for cardiac etiology")
+            }
         }
         
-        // Add associated symptoms
+        // Modifying factors with clinical insight
+        if text.contains("worse") && text.contains("cough") {
+            clinicalDetails.append("Symptoms are exacerbated by coughing, suggesting possible pleuritic involvement")
+        }
+        
+        // Associated symptoms with medical significance
         if context.symptoms.count > 1 {
             let associated = context.symptoms.dropFirst().map { $0.name }.joined(separator: ", ")
-            hpi += "Associated symptoms include \(associated). "
+            clinicalDetails.append("Associated symptoms include \(associated), which collectively heighten clinical concern")
         }
         
-        // Add negated findings
+        if !clinicalDetails.isEmpty {
+            hpi += clinicalDetails.joined(separator: ". ") + ". "
+        }
+        
+        // CONTEXTUAL HISTORY - Weave in relevant background
+        var contextualElements: [String] = []
+        
+        // Medical history with clinical relevance
+        if !context.conditions.isEmpty {
+            let activeConditions = context.conditions.filter { 
+                if case .active = $0.status { return true }
+                return false
+            }
+            if !activeConditions.isEmpty {
+                let conditions = activeConditions.map { $0.name }.joined(separator: ", ")
+                if text.contains("chest") && conditions.contains("diabetes") {
+                    contextualElements.append("The patient's history of \(conditions) is clinically significant, as diabetes increases risk for atypical cardiac presentations")
+                } else {
+                    contextualElements.append("Pertinent medical history includes \(conditions)")
+                }
+            }
+        }
+        
+        // Medication context with clinical implications
+        let discontinuedMeds = context.medications.filter {
+            if case .discontinued = $0.status { return true }
+            return false
+        }
+        
+        if !discontinuedMeds.isEmpty && text.contains("blood thinner") {
+            contextualElements.append("Of particular concern, the patient recently discontinued anticoagulation therapy, creating a significant thrombotic risk window")
+        }
+        
+        if !contextualElements.isEmpty {
+            hpi += contextualElements.joined(separator: ". ") + ". "
+        }
+        
+        // CLINICAL REASONING - Add physician-like insights
+        var insights: [String] = []
+        
+        // High-risk scenarios
+        if context.conditions.contains(where: { $0.name.lowercased().contains("thromboembolism") }) {
+            insights.append("This clinical scenario represents a high-risk presentation requiring immediate systematic evaluation")
+        }
+        
+        // Risk stratification
+        if text.contains("chest") && context.conditions.contains(where: { $0.name.contains("diabetes") }) {
+            insights.append("The combination of symptoms and diabetes necessitates careful cardiac evaluation")
+        }
+        
+        if !insights.isEmpty {
+            hpi += insights.joined(separator: ". ") + ". "
+        }
+        
+        // Add timeline with clinical context
+        if !context.timeline.isEmpty {
+            let timelineStr = context.timeline.map { $0.event }.joined(separator: ", ")
+            hpi += "Timeline of events includes \(timelineStr). "
+        }
+        
+        // Add relevant negations
         if !context.negations.isEmpty {
             let denies = context.negations.map { $0.finding }.joined(separator: ", ")
-            hpi += "Patient denies \(denies). "
+            hpi += "The patient specifically denies \(denies). "
         }
         
-        return hpi.isEmpty ? "History of present illness to be obtained from patient." : hpi
+        return hpi.isEmpty ? "History of present illness to be obtained through comprehensive patient interview." : hpi
     }
     
     private func extractAllergiesFromTranscription(from transcription: String) -> String {

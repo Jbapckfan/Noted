@@ -717,7 +717,9 @@ struct PurchaseFlowView: View {
             }
             .padding()
             .navigationTitle("Subscribe")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .navigationBarBackButtonHidden()
         }
     }
@@ -750,9 +752,11 @@ struct EnterpriseContactView: View {
             }
             .padding()
             .navigationTitle("Enterprise")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Close") {
                         dismiss()
                     }

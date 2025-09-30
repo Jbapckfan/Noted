@@ -1,526 +1,435 @@
 import Foundation
-import CoreData
 import Combine
-import SwiftUI
 
+/// Manages medical encounters with room-based organization and chief complaint tracking
 @MainActor
 class EncounterManager: ObservableObject {
+    static let shared = EncounterManager()
     
     // MARK: - Published Properties
     @Published var activeEncounters: [MedicalEncounter] = []
-    @Published var completedEncounters: [MedicalEncounter] = []
     @Published var currentEncounter: MedicalEncounter?
-    @Published var selectedBed: String = ""
-    @Published var savedEncounters: [MedicalEncounter] = []
-    @Published var isEncounterActive = false
+    @Published var availableRooms: [Room] = []
+    @Published var recentChiefComplaints: [String] = []
     
-    // MARK: - Private Properties
-    private let persistentContainer: NSPersistentContainer
-    private let userDefaults = UserDefaults.standard
-    private let activeEncountersKey = "ActiveEncounters"
-    private let completedEncountersKey = "CompletedEncounters"
-    private let maxActiveEncounters = 10
-    private let maxCompletedEncounters = 50
+    // MARK: - Encounter Status
+    enum EncounterStatus: String, CaseIterable, Codable {
+        case waiting = "Waiting"
+        case inProgress = "In Progress"
+        case completed = "Completed"
+        case followUp = "Follow-up Needed"
+        case discharged = "Discharged"
+        
+        var color: String {
+            switch self {
+            case .waiting: return "#FFB800"
+            case .inProgress: return "#007AFF"
+            case .completed: return "#34C759"
+            case .followUp: return "#FF9500"
+            case .discharged: return "#8E8E93"
+            }
+        }
+    }
+    
+    // MARK: - Room Types
+    enum RoomType: String, CaseIterable, Codable {
+        case examRoom = "Exam Room"
+        case procedure = "Procedure Room"
+        case trauma = "Trauma Bay"
+        case triage = "Triage"
+        case consultation = "Consultation"
+        case discharge = "Discharge"
+        
+        var icon: String {
+            switch self {
+            case .examRoom: return "stethoscope"
+            case .procedure: return "cross.case"
+            case .trauma: return "cross.fill"
+            case .triage: return "list.clipboard"
+            case .consultation: return "person.2"
+            case .discharge: return "house"
+            }
+        }
+    }
+    
+    // MARK: - Default Rooms
+    private let defaultRooms: [Room] = [
+        Room(number: "101", type: .examRoom, floor: 1),
+        Room(number: "102", type: .examRoom, floor: 1),
+        Room(number: "103", type: .examRoom, floor: 1),
+        Room(number: "104", type: .examRoom, floor: 1),
+        Room(number: "105", type: .examRoom, floor: 1),
+        Room(number: "201", type: .examRoom, floor: 2),
+        Room(number: "202", type: .examRoom, floor: 2),
+        Room(number: "203", type: .examRoom, floor: 2),
+        Room(number: "Trauma 1", type: .trauma, floor: 1),
+        Room(number: "Trauma 2", type: .trauma, floor: 1),
+        Room(number: "Proc 1", type: .procedure, floor: 1),
+        Room(number: "Proc 2", type: .procedure, floor: 1),
+        Room(number: "Triage", type: .triage, floor: 1),
+        Room(number: "Discharge", type: .examRoom, floor: 1)
+    ]
+    
+    // MARK: - Common Chief Complaints
+    private let commonChiefComplaints: [String] = [
+        "Chest pain",
+        "Shortness of breath", 
+        "Abdominal pain",
+        "Headache",
+        "Back pain",
+        "Fever",
+        "Nausea and vomiting",
+        "Dizziness",
+        "Cough",
+        "Sore throat",
+        "Joint pain",
+        "Skin rash",
+        "Fatigue",
+        "Anxiety",
+        "Follow-up visit",
+        "Medication refill",
+        "Physical exam",
+        "Lab results",
+        "Wound check",
+        "Blood pressure check"
+    ]
     
     init() {
-        persistentContainer = NSPersistentContainer(name: "NotedCore")
-        persistentContainer.loadPersistentStores { _, error in
-            if let error = error {
-                print("Core Data error: \(error)")
-            }
-        }
-        
-        loadEncounters()
-        loadSavedEncounters()
+        availableRooms = defaultRooms
+        loadRecentChiefComplaints()
     }
     
-    // MARK: - Encounter Management
-    func startNewEncounter(bed: String? = nil, chiefComplaint: String? = nil) {
-        // Save current encounter if exists
-        if let current = currentEncounter, !current.transcription.isEmpty {
-            saveEncounter(current)
-        }
-        
-        // Create new encounter
+    // MARK: - Encounter Creation
+    
+    func startNewEncounter(room: Room, chiefComplaint: String = "") -> MedicalEncounter {
         let encounter = MedicalEncounter(
-            id: UUID(),
-            timestamp: Date(),
-            bed: bed,
+            room: room,
             chiefComplaint: chiefComplaint,
-            transcription: "",
-            generatedNote: "",
-            noteType: .edNote,
-            status: .active
+            status: .inProgress,
+            startTime: Date()
         )
         
+        activeEncounters.append(encounter)
         currentEncounter = encounter
-        isEncounterActive = true
-    }
-    
-    func stopCurrentEncounter() {
-        guard let current = currentEncounter else { return }
         
-        current.status = .completed
-        current.endTime = Date()
-        
-        saveEncounter(current)
-        isEncounterActive = false
-    }
-    
-    func saveEncounter(_ encounter: MedicalEncounter) {
-        let context = persistentContainer.viewContext
-        
-        // Check if encounter already exists
-        let fetchRequest: NSFetchRequest<EncounterEntity> = EncounterEntity.fetchRequest()
-        fetchRequest.predicate = NSPredicate(format: "id == %@", encounter.id as CVarArg)
-        
-        do {
-            let existingEncounters = try context.fetch(fetchRequest)
-            let entity = existingEncounters.first ?? EncounterEntity(context: context)
-            
-            // Update entity
-            entity.id = encounter.id
-            entity.timestamp = encounter.timestamp
-            entity.bed = encounter.bed
-            entity.chiefComplaint = encounter.chiefComplaint
-            entity.transcription = encounter.transcription
-            entity.generatedNote = encounter.generatedNote
-            entity.noteType = encounter.noteType.rawValue
-            entity.status = encounter.status.rawValue
-            entity.endTime = encounter.endTime
-            
-            try context.save()
-            loadSavedEncounters()
-            
-        } catch {
-            print("Error saving encounter: \(error)")
-        }
-    }
-    
-    func loadEncounter(_ encounter: MedicalEncounter) {
-        // Save current if exists
-        if let current = currentEncounter, !current.transcription.isEmpty {
-            saveEncounter(current)
+        // Add to recent chief complaints if not empty
+        if !chiefComplaint.isEmpty {
+            addToRecentChiefComplaints(chiefComplaint)
         }
         
-        currentEncounter = encounter
-        isEncounterActive = encounter.status == .active
-    }
-    
-    func deleteEncounter(_ encounter: MedicalEncounter) {
-        let context = persistentContainer.viewContext
-        
-        let fetchRequest: NSFetchRequest<EncounterEntity> = EncounterEntity.fetchRequest()
-        fetchRequest.predicate = NSPredicate(format: "id == %@", encounter.id as CVarArg)
-        
-        do {
-            let entities = try context.fetch(fetchRequest)
-            for entity in entities {
-                context.delete(entity)
-            }
-            try context.save()
-            loadSavedEncounters()
-        } catch {
-            print("Error deleting encounter: \(error)")
+        // Mark room as occupied
+        if let index = availableRooms.firstIndex(where: { $0.id == room.id }) {
+            availableRooms[index].isOccupied = true
+            availableRooms[index].currentEncounter = encounter.id
         }
-    }
-    
-    private func loadSavedEncounters() {
-        let context = persistentContainer.viewContext
-        let fetchRequest: NSFetchRequest<EncounterEntity> = EncounterEntity.fetchRequest()
-        fetchRequest.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: false)]
-        fetchRequest.fetchLimit = 50 // Keep last 50 encounters
-        
-        do {
-            let entities = try context.fetch(fetchRequest)
-            savedEncounters = entities.compactMap { entity in
-                guard let id = entity.id,
-                      let timestamp = entity.timestamp,
-                      let noteTypeString = entity.noteType,
-                      let noteType = NoteType(rawValue: noteTypeString),
-                      let statusString = entity.status,
-                      let status = EncounterStatus(rawValue: statusString) else {
-                    return nil
-                }
-                
-                return MedicalEncounter(
-                    id: id,
-                    timestamp: timestamp,
-                    bed: entity.bed,
-                    chiefComplaint: entity.chiefComplaint,
-                    transcription: entity.transcription ?? "",
-                    generatedNote: entity.generatedNote ?? "",
-                    noteType: noteType,
-                    status: status,
-                    endTime: entity.endTime
-                )
-            }
-        } catch {
-            print("Error loading encounters: \(error)")
-        }
-    }
-    
-    // MARK: - Encounter Updates
-    func updateCurrentEncounterTranscription(_ text: String) {
-        currentEncounter?.transcription = text
-        
-        // Also update in active encounters if it exists there
-        if let encounter = currentEncounter,
-           let index = activeEncounters.firstIndex(where: { $0.id == encounter.id }) {
-            activeEncounters[index].transcription = text
-            saveActiveEncounters()
-        }
-    }
-    
-    func updateCurrentEncounterNote(_ note: String, type: NoteType) {
-        currentEncounter?.generatedNote = note
-        currentEncounter?.noteType = type
-        
-        // Also update in active encounters if it exists there
-        if let encounter = currentEncounter,
-           let index = activeEncounters.firstIndex(where: { $0.id == encounter.id }) {
-            activeEncounters[index].generatedNote = note
-            activeEncounters[index].noteType = type
-            saveActiveEncounters()
-        }
-    }
-    
-    // MARK: - Multi-Patient Workflow
-    
-    func createNewEncounter(bedLocation: String, chiefComplaint: String = "To be determined") -> MedicalEncounter {
-        let encounter = MedicalEncounter(
-            id: UUID(),
-            timestamp: Date(),
-            bed: bedLocation,
-            chiefComplaint: chiefComplaint,
-            transcription: "",
-            generatedNote: "",
-            noteType: .edNote,
-            status: .active
-        )
-        
-        // Remove any existing encounter for this bed
-        activeEncounters.removeAll { $0.bed == bedLocation }
-        
-        // Add new encounter
-        activeEncounters.insert(encounter, at: 0)
-        
-        // Limit active encounters
-        if activeEncounters.count > maxActiveEncounters {
-            let oldestEncounter = activeEncounters.removeLast()
-            archiveEncounter(oldestEncounter)
-        }
-        
-        currentEncounter = encounter
-        selectedBed = bedLocation
-        isEncounterActive = true
-        saveActiveEncounters()
         
         return encounter
     }
     
-    func completeEncounter(_ encounter: MedicalEncounter) {
-        let completedEncounter = encounter
-        completedEncounter.status = .completed
-        completedEncounter.endTime = Date()
-        
-        // Move from active to completed
-        activeEncounters.removeAll { $0.id == encounter.id }
-        completedEncounters.insert(completedEncounter, at: 0)
-        
-        // Limit completed encounters
-        if completedEncounters.count > maxCompletedEncounters {
-            completedEncounters.removeLast()
+    func startEncounterFromWatch(roomNumber: String, chiefComplaint: String = "") -> MedicalEncounter? {
+        guard let room = availableRooms.first(where: { $0.number == roomNumber }) else {
+            return nil
         }
         
-        // Clear current encounter if it was completed
-        if currentEncounter?.id == encounter.id {
+        return startNewEncounter(room: room, chiefComplaint: chiefComplaint)
+    }
+    
+    // MARK: - Encounter Management
+    
+    func updateEncounterStatus(_ encounterId: UUID, status: EncounterStatus) {
+        if let index = activeEncounters.firstIndex(where: { $0.id == encounterId }) {
+            activeEncounters[index].status = status
+            
+            if status == .completed || status == .discharged {
+                activeEncounters[index].endTime = Date()
+                
+                // Free up the room
+                if let roomIndex = availableRooms.firstIndex(where: { 
+                    $0.currentEncounter == encounterId 
+                }) {
+                    availableRooms[roomIndex].isOccupied = false
+                    availableRooms[roomIndex].currentEncounter = nil
+                }
+            }
+        }
+    }
+    
+    func updateEncounterChiefComplaint(_ encounterId: UUID, chiefComplaint: String) {
+        if let index = activeEncounters.firstIndex(where: { $0.id == encounterId }) {
+            activeEncounters[index].chiefComplaint = chiefComplaint
+            addToRecentChiefComplaints(chiefComplaint)
+        }
+    }
+    
+    func addTranscriptionToEncounter(_ encounterId: UUID, transcription: String) {
+        if let index = activeEncounters.firstIndex(where: { $0.id == encounterId }) {
+            activeEncounters[index].transcription += (activeEncounters[index].transcription.isEmpty ? "" : "\n") + transcription
+            activeEncounters[index].lastUpdated = Date()
+        }
+    }
+    
+    func completeEncounter(_ encounterId: UUID) {
+        updateEncounterStatus(encounterId, status: .completed)
+        
+        // If this was the current encounter, clear it
+        if currentEncounter?.id == encounterId {
             currentEncounter = nil
-            isEncounterActive = false
-        }
-        
-        saveEncounterData()
-    }
-    
-    func archiveEncounter(_ encounter: MedicalEncounter) {
-        let archivedEncounter = encounter
-        archivedEncounter.status = .completed // Using completed as archived
-        archivedEncounter.endTime = Date()
-        
-        activeEncounters.removeAll { $0.id == encounter.id }
-        completedEncounters.insert(archivedEncounter, at: 0)
-        
-        saveEncounterData()
-    }
-    
-    // MARK: - Encounter Lookup
-    
-    func getActiveEncounter(for bedLocation: String) -> MedicalEncounter? {
-        return activeEncounters.first { $0.bed == bedLocation }
-    }
-    
-    func getEncountersByBed() -> [String: [MedicalEncounter]] {
-        var encountersByBed: [String: [MedicalEncounter]] = [:]
-        
-        for encounter in activeEncounters {
-            let bedName = encounter.bed ?? "Unknown"
-            if encountersByBed[bedName] == nil {
-                encountersByBed[bedName] = []
-            }
-            encountersByBed[bedName]?.append(encounter)
-        }
-        
-        return encountersByBed
-    }
-    
-    func getRecentEncounters(limit: Int = 10) -> [MedicalEncounter] {
-        let allEncounters = activeEncounters + completedEncounters
-        return Array(allEncounters.sorted { $0.timestamp > $1.timestamp }.prefix(limit))
-    }
-    
-    func searchEncounters(query: String) -> [MedicalEncounter] {
-        let allEncounters = activeEncounters + completedEncounters
-        let searchQuery = query.lowercased()
-        
-        return allEncounters.filter { encounter in
-            (encounter.bed?.lowercased().contains(searchQuery) ?? false) ||
-            (encounter.chiefComplaint?.lowercased().contains(searchQuery) ?? false) ||
-            encounter.transcription.lowercased().contains(searchQuery)
         }
     }
     
-    // MARK: - Bed Management
+    // MARK: - Room Management
     
-    func switchToBed(_ bedLocation: String) {
-        selectedBed = bedLocation
+    func getAvailableRooms() -> [Room] {
+        return availableRooms.filter { !$0.isOccupied }
+    }
+    
+    func getRoomsByFloor(_ floor: Int) -> [Room] {
+        return availableRooms.filter { $0.floor == floor }
+    }
+    
+    func getRoomsByType(_ type: RoomType) -> [Room] {
+        return availableRooms.filter { $0.type == type }
+    }
+    
+    func findRoom(by number: String) -> Room? {
+        return availableRooms.first { $0.number.lowercased() == number.lowercased() }
+    }
+    
+    // MARK: - Chief Complaint Management
+    
+    private func addToRecentChiefComplaints(_ complaint: String) {
+        // Remove if already exists
+        recentChiefComplaints.removeAll { $0.lowercased() == complaint.lowercased() }
         
-        // Load existing encounter for this bed or create new one
-        if let existingEncounter = getActiveEncounter(for: bedLocation) {
-            currentEncounter = existingEncounter
-            isEncounterActive = existingEncounter.status == .active
-        } else {
-            currentEncounter = createNewEncounter(bedLocation: bedLocation)
+        // Add to beginning
+        recentChiefComplaints.insert(complaint, at: 0)
+        
+        // Keep only last 20
+        if recentChiefComplaints.count > 20 {
+            recentChiefComplaints.removeLast()
         }
+        
+        saveRecentChiefComplaints()
     }
     
-    func getOccupiedBeds() -> [String] {
-        return Array(Set(activeEncounters.compactMap { $0.bed }))
-    }
-    
-    func getBedStatus(_ bedLocation: String) -> BedStatus {
-        if let encounter = getActiveEncounter(for: bedLocation) {
-            switch encounter.status {
-            case .active:
-                return .occupied
-            case .completed:
-                return .ready
-            case .draft:
-                return .cleanup
-            }
+    func getChiefComplaintSuggestions(for text: String) -> [String] {
+        let searchText = text.lowercased()
+        
+        if searchText.isEmpty {
+            return Array(recentChiefComplaints.prefix(10))
         }
-        return .available
+        
+        var suggestions: [String] = []
+        
+        // First, exact matches from recent
+        suggestions.append(contentsOf: recentChiefComplaints.filter { 
+            $0.lowercased().contains(searchText) 
+        })
+        
+        // Then, matches from common complaints
+        suggestions.append(contentsOf: commonChiefComplaints.filter { 
+            $0.lowercased().contains(searchText) && 
+            !suggestions.contains($0)
+        })
+        
+        return Array(suggestions.prefix(10))
     }
     
-    // MARK: - Statistics
+    // MARK: - Encounter Search and Filtering
+    
+    func getEncountersByStatus(_ status: EncounterStatus) -> [MedicalEncounter] {
+        return activeEncounters.filter { $0.status == status }
+    }
+    
+    func getEncountersByRoom(_ room: Room) -> [MedicalEncounter] {
+        return activeEncounters.filter { $0.room.id == room.id }
+    }
     
     func getTodaysEncounters() -> [MedicalEncounter] {
         let calendar = Calendar.current
         let today = Date()
         
-        let allEncounters = activeEncounters + completedEncounters
-        return allEncounters.filter { encounter in
-            calendar.isDate(encounter.timestamp, inSameDayAs: today)
+        return activeEncounters.filter { encounter in
+            calendar.isDate(encounter.startTime, inSameDayAs: today)
         }
     }
     
-    func getEncounterStats() -> EncounterStats {
-        let todaysEncounters = getTodaysEncounters()
-        
-        return EncounterStats(
-            totalToday: todaysEncounters.count,
-            activeCount: activeEncounters.count,
-            completedToday: todaysEncounters.filter { $0.status == .completed }.count,
-            averageDuration: calculateAverageDuration(todaysEncounters),
-            occupiedBeds: getOccupiedBeds().count
-        )
-    }
-    
-    private func calculateAverageDuration(_ encounters: [MedicalEncounter]) -> TimeInterval {
-        let completedEncounters = encounters.filter { $0.status == .completed }
-        guard !completedEncounters.isEmpty else { return 0 }
-        
-        let totalDuration = completedEncounters.reduce(0) { total, encounter in
-            let duration = (encounter.endTime ?? Date()).timeIntervalSince(encounter.timestamp)
-            return total + duration
-        }
-        
-        return totalDuration / Double(completedEncounters.count)
-    }
-    
-    // MARK: - Enhanced Persistence
-    
-    private func saveActiveEncounters() {
-        saveToDefaults(activeEncounters, key: activeEncountersKey)
-    }
-    
-    private func saveCompletedEncounters() {
-        saveToDefaults(completedEncounters, key: completedEncountersKey)
-    }
-    
-    private func saveEncounterData() {
-        saveActiveEncounters()
-        saveCompletedEncounters()
-    }
-    
-    private func saveToDefaults<T: Codable>(_ data: T, key: String) {
-        do {
-            let encoded = try JSONEncoder().encode(data)
-            userDefaults.set(encoded, forKey: key)
-        } catch {
-            print("Failed to save \(key): \(error)")
+    func getActiveEncounters() -> [MedicalEncounter] {
+        return activeEncounters.filter { 
+            $0.status == .inProgress || $0.status == .waiting 
         }
     }
     
-    private func loadEncounters() {
-        activeEncounters = loadFromDefaults([MedicalEncounter].self, key: activeEncountersKey) ?? []
-        completedEncounters = loadFromDefaults([MedicalEncounter].self, key: completedEncountersKey) ?? []
-        
-        // Set current encounter to most recent active
-        currentEncounter = activeEncounters.first
-        selectedBed = currentEncounter?.bed ?? ""
-        isEncounterActive = currentEncounter?.status == .active
-    }
+    // MARK: - Watch Integration Support
     
-    private func loadFromDefaults<T: Codable>(_ type: T.Type, key: String) -> T? {
-        guard let data = userDefaults.data(forKey: key) else { return nil }
-        
-        do {
-            return try JSONDecoder().decode(type, from: data)
-        } catch {
-            print("Failed to load \(key): \(error)")
-            return nil
+    func getWatchRoomList() -> [WatchRoom] {
+        return availableRooms.map { room in
+            WatchRoom(
+                number: room.number,
+                type: room.type.rawValue,
+                isOccupied: room.isOccupied,
+                floor: room.floor,
+                hasActiveEncounter: room.currentEncounter != nil
+            )
         }
     }
     
-    // MARK: - Export/Import
-    
-    func exportEncounters() -> Data? {
-        let exportData = EncounterExport(
-            activeEncounters: activeEncounters,
-            completedEncounters: completedEncounters,
-            exportDate: Date()
-        )
+    func startEncounterFromWatchData(_ data: [String: Any]) -> MedicalEncounter? {
+        guard let roomNumber = data["roomNumber"] as? String else { return nil }
         
-        return try? JSONEncoder().encode(exportData)
+        let chiefComplaint = data["chiefComplaint"] as? String ?? ""
+        
+        return startEncounterFromWatch(roomNumber: roomNumber, chiefComplaint: chiefComplaint)
     }
     
-    func importEncounters(from data: Data) throws {
-        let importData = try JSONDecoder().decode(EncounterExport.self, from: data)
-        
-        // Merge imported encounters (avoiding duplicates)
-        for encounter in importData.activeEncounters {
-            if !activeEncounters.contains(where: { $0.id == encounter.id }) {
-                activeEncounters.append(encounter)
-            }
-        }
-        
-        for encounter in importData.completedEncounters {
-            if !completedEncounters.contains(where: { $0.id == encounter.id }) {
-                completedEncounters.append(encounter)
-            }
-        }
-        
-        saveEncounterData()
-    }
-}
-
-// MARK: - Medical Encounter Model
-class MedicalEncounter: ObservableObject, Identifiable, Codable {
-    let id: UUID
-    let timestamp: Date
-    var bed: String?
-    var chiefComplaint: String?
-    @Published var transcription: String
-    @Published var generatedNote: String
-    @Published var noteType: NoteType
-    @Published var status: EncounterStatus
-    var endTime: Date?
+    // MARK: - Statistics and Analytics
     
-    init(id: UUID = UUID(),
-         timestamp: Date = Date(),
-         bed: String? = nil,
-         chiefComplaint: String? = nil,
-         transcription: String = "",
-         generatedNote: String = "",
-         noteType: NoteType = .edNote,
-         status: EncounterStatus = .active,
-         endTime: Date? = nil) {
+    func getEncounterStatistics() -> EncounterStatistics {
+        let today = getTodaysEncounters()
+        let active = getActiveEncounters()
+        let completed = getEncountersByStatus(.completed)
         
-        self.id = id
-        self.timestamp = timestamp
-        self.bed = bed
-        self.chiefComplaint = chiefComplaint
-        self.transcription = transcription
-        self.generatedNote = generatedNote
-        self.noteType = noteType
-        self.status = status
-        self.endTime = endTime
-    }
-    
-    // MARK: - Codable Implementation
-    enum CodingKeys: CodingKey {
-        case id, timestamp, bed, chiefComplaint, transcription, generatedNote, noteType, status, endTime
-    }
-    
-    required init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        
-        id = try container.decode(UUID.self, forKey: .id)
-        timestamp = try container.decode(Date.self, forKey: .timestamp)
-        bed = try container.decodeIfPresent(String.self, forKey: .bed)
-        chiefComplaint = try container.decodeIfPresent(String.self, forKey: .chiefComplaint)
-        transcription = try container.decode(String.self, forKey: .transcription)
-        generatedNote = try container.decode(String.self, forKey: .generatedNote)
-        noteType = try container.decode(NoteType.self, forKey: .noteType)
-        status = try container.decode(EncounterStatus.self, forKey: .status)
-        endTime = try container.decodeIfPresent(Date.self, forKey: .endTime)
-    }
-    
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        
-        try container.encode(id, forKey: .id)
-        try container.encode(timestamp, forKey: .timestamp)
-        try container.encodeIfPresent(bed, forKey: .bed)
-        try container.encodeIfPresent(chiefComplaint, forKey: .chiefComplaint)
-        try container.encode(transcription, forKey: .transcription)
-        try container.encode(generatedNote, forKey: .generatedNote)
-        try container.encode(noteType, forKey: .noteType)
-        try container.encode(status, forKey: .status)
-        try container.encodeIfPresent(endTime, forKey: .endTime)
-    }
-    
-    var displayTitle: String {
-        if let bed = bed, let complaint = chiefComplaint {
-            return "\(bed) - \(complaint)"
-        } else if let bed = bed {
-            return bed
-        } else if let complaint = chiefComplaint {
-            return complaint
+        let averageDuration: TimeInterval
+        if !completed.isEmpty {
+            let totalDuration = completed.compactMap { encounter in
+                encounter.duration
+            }.reduce(0, +)
+            averageDuration = totalDuration / Double(completed.count)
         } else {
-            return "Encounter \(timestamp.formatted(date: .omitted, time: .shortened))"
+            averageDuration = 0
+        }
+        
+        return EncounterStatistics(
+            totalToday: today.count,
+            activeCount: active.count,
+            completedCount: completed.count,
+            averageDuration: averageDuration,
+            roomUtilization: calculateRoomUtilization()
+        )
+    }
+    
+    private func calculateRoomUtilization() -> Float {
+        let occupiedRooms = availableRooms.filter { $0.isOccupied }.count
+        return Float(occupiedRooms) / Float(availableRooms.count)
+    }
+    
+    // MARK: - Persistence
+    
+    private func saveRecentChiefComplaints() {
+        UserDefaults.standard.set(recentChiefComplaints, forKey: "recent_chief_complaints")
+    }
+    
+    private func loadRecentChiefComplaints() {
+        if let saved = UserDefaults.standard.array(forKey: "recent_chief_complaints") as? [String] {
+            recentChiefComplaints = saved
         }
     }
     
-    var timeAgo: String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: timestamp, relativeTo: Date())
+    // MARK: - Export Functions
+    
+    func exportEncounterData(_ encounter: MedicalEncounter) -> [String: Any] {
+        return [
+            "id": encounter.id.uuidString,
+            "roomNumber": encounter.room.number,
+            "chiefComplaint": encounter.chiefComplaint,
+            "status": encounter.status.rawValue,
+            "startTime": ISO8601DateFormatter().string(from: encounter.startTime),
+            "endTime": encounter.endTime.map { ISO8601DateFormatter().string(from: $0) } ?? "",
+            "duration": encounter.duration ?? 0,
+            "transcription": encounter.transcription,
+            "lastUpdated": ISO8601DateFormatter().string(from: encounter.lastUpdated)
+        ]
+    }
+    
+    func generateEncounterSummary(_ encounter: MedicalEncounter) -> String {
+        var summary = "ENCOUNTER SUMMARY\n"
+        summary += "Room: \(encounter.room.number)\n"
+        summary += "Chief Complaint: \(encounter.chiefComplaint.isEmpty ? "Not specified" : encounter.chiefComplaint)\n"
+        summary += "Start Time: \(encounter.startTime.formatted(date: .abbreviated, time: .shortened))\n"
+        
+        if let endTime = encounter.endTime {
+            summary += "End Time: \(endTime.formatted(date: .abbreviated, time: .shortened))\n"
+            if let duration = encounter.duration {
+                let minutes = Int(duration / 60)
+                summary += "Duration: \(minutes) minutes\n"
+            }
+        }
+        
+        summary += "Status: \(encounter.status.rawValue)\n"
+        
+        if !encounter.transcription.isEmpty {
+            summary += "\nTRANSCRIPTION:\n"
+            summary += encounter.transcription
+        }
+        
+        return summary
     }
 }
 
-enum EncounterStatus: String, CaseIterable, Codable {
-    case active = "active"
-    case completed = "completed"
-    case draft = "draft"
+// MARK: - Data Models
+
+struct MedicalEncounter: Identifiable, Codable {
+    let id = UUID()
+    let room: Room
+    var chiefComplaint: String
+    var status: EncounterManager.EncounterStatus
+    let startTime: Date
+    var endTime: Date?
+    var transcription: String = ""
+    var lastUpdated: Date = Date()
+    var notes: String = ""
+    var structuredNote: StructuredMedicalNote?
+    var actionItems: [MedicalAction] = []
+    
+    var duration: TimeInterval? {
+        if let endTime = endTime {
+            return endTime.timeIntervalSince(startTime)
+        }
+        return nil
+    }
+    
+    var isActive: Bool {
+        return status == .inProgress || status == .waiting
+    }
+}
+
+struct Room: Identifiable, Codable {
+    let id = UUID()
+    let number: String
+    let type: EncounterManager.RoomType
+    let floor: Int
+    var isOccupied: Bool = false
+    var currentEncounter: UUID?
+    var equipment: [String] = []
+    var specialNotes: String = ""
+    
+    var displayName: String {
+        return "\(type.rawValue) \(number)"
+    }
+}
+
+struct WatchRoom: Identifiable {
+    let id = UUID()
+    let number: String
+    let type: String
+    let isOccupied: Bool
+    let floor: Int
+    let hasActiveEncounter: Bool
+}
+
+struct EncounterStatistics {
+    let totalToday: Int
+    let activeCount: Int
+    let completedCount: Int
+    let averageDuration: TimeInterval
+    let roomUtilization: Float
+    
+    var formattedAverageDuration: String {
+        let minutes = Int(averageDuration / 60)
+        return "\(minutes) min"
+    }
+    
+    var formattedUtilization: String {
+        return "\(Int(roomUtilization * 100))%"
+    }
 }

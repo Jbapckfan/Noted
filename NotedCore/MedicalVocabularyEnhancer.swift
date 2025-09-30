@@ -2,6 +2,21 @@ import Foundation
 import NaturalLanguage
 import Speech
 
+// Correction tracking structure
+struct Correction {
+    let original: String
+    let corrected: String
+    let confidence: Float
+    let type: CorrectionType
+    
+    enum CorrectionType {
+        case phonetic
+        case abbreviation
+        case spelling
+        case contextual
+    }
+}
+
 // Medical vocabulary enhancement for transcription accuracy
 @MainActor
 class MedicalVocabularyEnhancer: ObservableObject {
@@ -156,7 +171,7 @@ class MedicalVocabularyEnhancer: ObservableObject {
     func enhanceTranscriptionRequest(_ request: SFSpeechAudioBufferRecognitionRequest) {
         // Add custom vocabulary
         request.addsPunctuation = true
-        request.requiresOnDeviceRecognition = false // Use server for better accuracy
+        request.requiresOnDeviceRecognition = true // Use Neural Engine for fastest processing
         
         // Set task hint for medical context
         if #available(iOS 16.0, *) {
@@ -426,68 +441,189 @@ class MedicalVocabularyEnhancer: ObservableObject {
         
         return String(text[startIndex..<endIndex])
     }
-}
 
-// MARK: - Supporting Types
-struct Correction {
-    let original: String
-    let corrected: String
-    let confidence: Float
-    let type: CorrectionType
     
-    enum CorrectionType {
-        case phonetic
-        case abbreviation
-        case spelling
-        case contextual
+    // MARK: - Transcript Analysis
+    
+    func analyzeTranscript(_ transcript: String) -> ConversationAnalysis {
+        let text = transcript.lowercased()
+        
+        return ConversationAnalysis(
+            chiefComplaint: extractChiefComplaint(from: text),
+            timing: extractTiming(from: text),
+            symptoms: extractSymptoms(from: text),
+            medicalHistory: extractMedicalHistory(from: text),
+            medications: extractMedications(from: text),
+            socialHistory: extractSocialHistory(from: text),
+            workup: extractWorkup(from: text),
+            riskFactors: extractRiskFactors(from: text),
+            originalText: transcript
+        )
     }
-}
-
-// MARK: - Medical Phrase Templates
-class MedicalPhraseTemplates {
-    static let commonPhrases = [
-        // Chief complaints
-        "patient presents with",
-        "complains of",
-        "reports",
-        "denies",
-        "states that",
-        
-        // HPI
-        "onset was",
-        "started approximately",
-        "has been ongoing for",
-        "associated with",
-        "aggravated by",
-        "alleviated by",
-        "rates the pain",
-        "describes the pain as",
-        
-        // Physical exam
-        "on examination",
-        "physical exam reveals",
-        "vital signs show",
-        "appears comfortable",
-        "in no acute distress",
-        "alert and oriented",
-        
-        // Assessment/Plan
-        "differential diagnosis includes",
-        "plan to obtain",
-        "will order",
-        "recommend",
-        "follow up with",
-        "return if",
-        "discharge home with"
-    ]
     
-    static func createPhraseBooster() -> [String: Float] {
-        var booster: [String: Float] = [:]
+    private func extractChiefComplaint(from text: String) -> String {
+        let patterns = [
+            "complaining of", "here for", "presents with", "came in with",
+            "chief complaint", "main concern", "problem is", "issue is",
+            "pain in", "experiencing", "suffering from", "having"
+        ]
         
-        for phrase in commonPhrases {
-            booster[phrase] = 1.5 // Boost confidence when these phrases detected
+        for pattern in patterns {
+            if let range = text.range(of: pattern) {
+                let startIdx = text.index(range.upperBound, offsetBy: 0)
+                let endIdx = min(text.endIndex, text.index(startIdx, offsetBy: 100))
+                let complaint = String(text[startIdx..<endIdx])
+                    .components(separatedBy: CharacterSet(charactersIn: ".!?"))[0]
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                if !complaint.isEmpty && complaint.count > 3 {
+                    return complaint
+                }
+            }
         }
         
-        return booster
+        return "Patient encounter"
+    }
+    
+    private func extractSymptoms(from text: String) -> [String] {
+        let symptomKeywords = [
+            "pain", "ache", "burning", "tingling", "numbness", "weakness",
+            "fever", "chills", "sweats", "fatigue", "tired", "exhausted",
+            "nausea", "vomiting", "diarrhea", "constipation", "bloating",
+            "cough", "shortness of breath", "chest pain", "palpitations",
+            "headache", "dizziness", "lightheaded", "syncope", "fainting",
+            "rash", "itching", "swelling", "redness", "discharge",
+            "blurry vision", "double vision", "hearing loss", "ringing",
+            "sore throat", "difficulty swallowing", "hoarseness"
+        ]
+        
+        var symptoms: [String] = []
+        for symptom in symptomKeywords {
+            if text.contains(symptom) {
+                if let range = text.range(of: symptom) {
+                    let startIdx = max(text.startIndex, text.index(range.lowerBound, offsetBy: -20))
+                    let endIdx = min(text.endIndex, text.index(range.upperBound, offsetBy: 50))
+                    let context = String(text[startIdx..<endIdx])
+                    symptoms.append(context.trimmingCharacters(in: .whitespacesAndNewlines))
+                }
+            }
+        }
+        
+        return Array(Set(symptoms))
+    }
+    
+    private func extractMedicalHistory(from text: String) -> [String] {
+        let historyPatterns = [
+            "history of", "diagnosed with", "previous", "past medical",
+            "pmh", "chronic", "diabetes", "hypertension", "asthma",
+            "copd", "heart disease", "cancer", "surgery", "hospitalization"
+        ]
+        
+        var history: [String] = []
+        for pattern in historyPatterns {
+            if text.contains(pattern) {
+                if let range = text.range(of: pattern) {
+                    let startIdx = max(text.startIndex, text.index(range.lowerBound, offsetBy: -10))
+                    let endIdx = min(text.endIndex, text.index(range.upperBound, offsetBy: 60))
+                    let context = String(text[startIdx..<endIdx])
+                    history.append(context.trimmingCharacters(in: .whitespacesAndNewlines))
+                }
+            }
+        }
+        
+        return Array(Set(history))
+    }
+    
+    private func extractMedications(from text: String) -> [String] {
+        let medPatterns = [
+            "taking", "on", "medications", "prescribed", "doses",
+            "aspirin", "ibuprofen", "tylenol", "acetaminophen",
+            "lisinopril", "metformin", "atorvastatin", "omeprazole",
+            "metoprolol", "amlodipine", "gabapentin", "prednisone"
+        ]
+        
+        var meds: [String] = []
+        for pattern in medPatterns {
+            if text.contains(pattern) {
+                if let range = text.range(of: pattern) {
+                    let startIdx = max(text.startIndex, text.index(range.lowerBound, offsetBy: -20))
+                    let endIdx = min(text.endIndex, text.index(range.upperBound, offsetBy: 40))
+                    let context = String(text[startIdx..<endIdx])
+                    meds.append(context.trimmingCharacters(in: .whitespacesAndNewlines))
+                }
+            }
+        }
+        
+        return Array(Set(meds))
+    }
+    
+
+    
+    private func extractTiming(from text: String) -> String? {
+        let timingPatterns = [
+            "started", "began", "for the past", "since", "ago",
+            "yesterday", "today", "this morning", "last night"
+        ]
+        
+        for pattern in timingPatterns {
+            if text.contains(pattern) {
+                if let range = text.range(of: pattern) {
+                    let startIdx = max(text.startIndex, text.index(range.lowerBound, offsetBy: -20))
+                    let endIdx = min(text.endIndex, text.index(range.upperBound, offsetBy: 50))
+                    let context = String(text[startIdx..<endIdx])
+                    return context.trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+            }
+        }
+        
+        return nil
+    }
+    
+    private func extractWorkup(from text: String) -> [String] {
+        var tests: [String] = []
+        let testKeywords = [
+            "ekg", "ecg", "x-ray", "xray", "ct", "mri", "ultrasound",
+            "blood work", "labs", "cbc", "bmp", "troponin", "d-dimer"
+        ]
+        
+        for test in testKeywords {
+            if text.contains(test) {
+                tests.append(test.uppercased())
+            }
+        }
+        
+        return tests
+    }
+    
+    private func extractRiskFactors(from text: String) -> [String] {
+        var factors: [String] = []
+        let riskKeywords = [
+            "diabetes", "hypertension", "smoking", "obesity", "family history",
+            "sedentary", "alcohol", "high cholesterol"
+        ]
+        
+        for risk in riskKeywords {
+            if text.contains(risk) {
+                factors.append(risk)
+            }
+        }
+        
+        return factors
+    }
+    
+    private func extractSocialHistory(from text: String) -> [String] {
+        var social: [String] = []
+        let socialPatterns = [
+            "smokes", "drinks", "alcohol", "tobacco", "drugs",
+            "occupation", "lives", "married", "divorced"
+        ]
+        
+        for pattern in socialPatterns {
+            if text.contains(pattern) {
+                social.append(pattern)
+            }
+        }
+        
+        return social
     }
 }

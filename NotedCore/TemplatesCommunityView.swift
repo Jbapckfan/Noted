@@ -86,7 +86,7 @@ struct TemplatesCommunityView: View {
                         .font(.caption)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(Color(.systemGray5))
+                        .background(Color.gray.opacity(0.2))
                         .cornerRadius(15)
                     }
                     
@@ -106,7 +106,7 @@ struct TemplatesCommunityView: View {
                         .font(.caption)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(Color(.systemGray5))
+                        .background(Color.gray.opacity(0.2))
                         .cornerRadius(15)
                     }
                 }
@@ -240,7 +240,7 @@ struct TemplatesCommunityView: View {
     
     // MARK: - Toolbar
     private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .navigationBarTrailing) {
+        ToolbarItem(placement: .automatic) {
             Button(action: {
                 showingVoiceExamples = true
             }) {
@@ -295,7 +295,7 @@ struct TemplateRowView: View {
                             Image(systemName: templateService.isFavorite(template) ? "star.fill" : "star")
                                 .foregroundColor(templateService.isFavorite(template) ? .yellow : .gray)
                         }
-                        .buttonStyle(PlainButtonStyle())
+                        .buttonStyle(.plain)
                         
                         // Rating
                         HStack(spacing: 2) {
@@ -317,7 +317,7 @@ struct TemplateRowView: View {
                                 .font(.caption2)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 2)
-                                .background(Color(.systemGray5))
+                                .background(Color.gray.opacity(0.2))
                                 .cornerRadius(10)
                         }
                         
@@ -330,10 +330,10 @@ struct TemplateRowView: View {
                 }
             }
             .padding()
-            .background(Color(.systemGray6))
+            .background(Color.gray.opacity(0.1))
             .cornerRadius(12)
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(.plain)
     }
 }
 
@@ -360,10 +360,10 @@ struct QuickTemplateCard: View {
                     .foregroundColor(.blue)
             }
             .frame(width: 100, height: 100)
-            .background(Color(.systemGray6))
+            .background(Color.gray.opacity(0.1))
             .cornerRadius(12)
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(.plain)
     }
 }
 
@@ -412,10 +412,10 @@ struct PopularTemplateCard: View {
             }
             .padding()
             .frame(width: 160, height: 100)
-            .background(Color(.systemGray6))
+            .background(Color.gray.opacity(0.1))
             .cornerRadius(12)
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(.plain)
     }
 }
 
@@ -499,7 +499,7 @@ struct VoiceCommandExamplesView: View {
                             }
                         }
                         .padding()
-                        .background(Color(.systemGray6))
+                        .background(Color.gray.opacity(0.1))
                         .cornerRadius(12)
                     }
                     
@@ -550,9 +550,11 @@ struct VoiceCommandExamplesView: View {
                 .padding()
             }
             .navigationTitle("Voice Commands")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") {
                         dismiss()
                     }

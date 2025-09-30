@@ -13,22 +13,29 @@ final class CoreAppState: ObservableObject {
     @Published var isBluetoothAvailable: Bool = false
     @Published var isRecording: Bool = false
     @Published var recordingDuration: Int = 0
+    @Published var currentRoom: String = ""
+    @Published var currentChiefComplaint: String = ""
+    
+    // Specialty preset (default ED)
+    @Published var specialty: MedicalSpecialty = .emergency
     
     // Session management
     @Published var currentSessionId: String = ""
     @Published var sessions: [MedicalSession] = []
     
     // MARK: - Zero Latency Engine
-    @Published var zeroLatencyEngine = ZeroLatencyTranscriptionEngine()
+    // @Published var zeroLatencyEngine = ZeroLatencyTranscriptionEngine() // Disabled temporarily
     
     // MARK: - Ollama Medical Summarizer
-    @Published var ollamaSummarizer = OllamaMedicalSummarizer()
+    // @Published var ollamaSummarizer = OllamaMedicalSummarizer() // Disabled temporarily
     
     // MARK: - Feature Toggles
     @Published var isBillingCodeSuggestionsEnabled: Bool = false
     @Published var isClinicalToolSuggestionsEnabled: Bool = false  // Clinical calculators/tools
+    @Published var isContraindicationAlertsEnabled: Bool = false  // Drug interaction alerts
     @Published var billingCodePreferences = BillingCodePreferences()
     @Published var clinicalToolPreferences = ClinicalToolPreferences()
+    @Published var clinicalAlertPreferences = ClinicalAlertPreferences()
     
     static let shared = CoreAppState()
     
@@ -52,9 +59,29 @@ final class CoreAppState: ObservableObject {
         var specialtySpecific: Bool = true
     }
     
+    // MARK: - Clinical Alert Preferences
+    struct ClinicalAlertPreferences {
+        var enableRedFlags: Bool = true
+        var enableDrugInteractions: Bool = true
+        var alertSeverityThreshold: String = "moderate"
+        var showCriticalAlerts: Bool = true
+        var showDrugInteractions: Bool = true
+        var showLabAlerts: Bool = true
+        var showAllergyWarnings: Bool = true
+        var showDosageAlerts: Bool = true
+        var showMissingDocumentation: Bool = true
+        var showMalpracticeRisks: Bool = true
+        var alertSoundEnabled: Bool = true
+        var alertVibrationEnabled: Bool = true
+    }
+    
     enum MedicalSpecialty: String, CaseIterable {
-        case generalPractice = "General Practice"
         case emergency = "Emergency Medicine"
+        case hospitalMedicine = "Hospital Medicine"
+        case clinic = "Clinic Medicine"
+        case urgentCare = "Urgent Care"
+        // Additional specialties for future expansions
+        case generalPractice = "General Practice"
         case cardiology = "Cardiology"
         case psychiatry = "Psychiatry"
         case pediatrics = "Pediatrics"

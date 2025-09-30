@@ -628,55 +628,77 @@ struct RedFlagAlertView: View {
     @ObservedObject var service = MedicalRedFlagService.shared
     @State private var showingDetails = false
     
+    private var criticalFlags: [MedicalRedFlagService.DetectedRedFlag] {
+        service.detectedRedFlags.filter { $0.redFlag.severity == .critical }
+    }
+    
     var body: some View {
-        if service.hasActiveCriticalFlags {
-            VStack(spacing: 12) {
-                HStack {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.red)
-                        .font(.title)
-                    
-                    Text("CRITICAL RED FLAGS DETECTED")
-                        .font(.headline)
-                        .foregroundColor(.red)
-                    
-                    Spacer()
-                    
-                    Button(action: { showingDetails.toggle() }) {
-                        Image(systemName: showingDetails ? "chevron.up" : "chevron.down")
-                    }
-                }
-                .padding()
-                .background(Color.red.opacity(0.1))
-                .cornerRadius(8)
-                
-                if showingDetails {
-                    ForEach(service.detectedRedFlags.filter { $0.redFlag.severity == .critical }) { flag in
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(flag.redFlag.category.icon + " " + flag.redFlag.category.rawValue)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            
-                            Text(flag.matchedPhrase.capitalized)
-                                .font(.headline)
-                            
-                            Text(flag.redFlag.clinicalSignificance)
-                                .font(.caption)
-                                .foregroundColor(.red)
-                            
-                            Text("ACTION: " + flag.redFlag.recommendedAction)
-                                .font(.caption2)
-                                .padding(4)
-                                .background(Color.red.opacity(0.1))
-                                .cornerRadius(4)
-                        }
-                        .padding()
-                        .background(Color(UIColor.secondarySystemBackground))
-                        .cornerRadius(8)
-                    }
-                }
+        Group {
+            if service.hasActiveCriticalFlags {
+                alertContent
             }
-            .animation(.easeInOut, value: showingDetails)
         }
+    }
+    
+    private var alertContent: some View {
+        VStack(spacing: 12) {
+            alertHeader
+            
+            if showingDetails {
+                detailsList
+            }
+        }
+        .animation(.easeInOut, value: showingDetails)
+    }
+    
+    private var alertHeader: some View {
+        HStack {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.red)
+                .font(.title)
+            
+            Text("CRITICAL RED FLAGS DETECTED")
+                .font(.headline)
+                .foregroundColor(.red)
+            
+            Spacer()
+            
+            Button(action: { showingDetails.toggle() }) {
+                Image(systemName: showingDetails ? "chevron.up" : "chevron.down")
+            }
+        }
+        .padding()
+        .background(Color.red.opacity(0.1))
+        .cornerRadius(8)
+    }
+    
+    private var detailsList: some View {
+        ForEach(criticalFlags) { flag in
+            flagDetailRow(flag)
+        }
+    }
+    
+    private func flagDetailRow(_ flag: MedicalRedFlagService.DetectedRedFlag) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(flag.redFlag.category.icon + " " + flag.redFlag.category.rawValue)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            Text(flag.matchedPhrase.capitalized)
+                .font(.headline)
+            
+            Text(flag.redFlag.clinicalSignificance)
+                .font(.caption)
+                .foregroundColor(.red)
+            
+            Text("ACTION: " + flag.redFlag.recommendedAction)
+                .font(.caption2)
+                .padding(4)
+                .background(Color.red.opacity(0.1))
+                .cornerRadius(4)
+        }
+        .padding()
+        .background(Color.gray.opacity(0.1))
+        .cornerRadius(8)
     }
 }

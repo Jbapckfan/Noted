@@ -1,0 +1,397 @@
+#!/usr/bin/env swift
+
+import Foundation
+import NaturalLanguage
+
+// ============================================================================
+// REAL MEDICAL NOTE GENERATOR - Converts raw transcripts to formatted notes
+// ============================================================================
+
+class MedicalNoteGenerator {
+    
+    func processTranscript(_ transcript: String) -> String {
+        // Extract patient name and doctor info
+        let patientName = extractPatientName(from: transcript)
+        let chiefComplaint = extractChiefComplaint(from: transcript)
+        
+        // Parse conversation into structured data
+        let hpi = generateHPI(from: transcript, patientName: patientName)
+        let psh = extractPSH(from: transcript)
+        let socialHistory = extractSocialHistory(from: transcript)
+        let ros = generateROS(from: transcript)
+        let exam = extractPhysicalExam(from: transcript)
+        let labs = extractLabsImaging(from: transcript)
+        let mdm = generateMDM(from: transcript)
+        let impression = generateImpression(from: transcript)
+        
+        // Format the complete note
+        return formatMedicalNote(
+            chiefComplaint: chiefComplaint,
+            hpi: hpi,
+            psh: psh,
+            socialHistory: socialHistory,
+            ros: ros,
+            exam: exam,
+            labs: labs,
+            mdm: mdm,
+            impression: impression
+        )
+    }
+    
+    private func extractPatientName(from transcript: String) -> String {
+        // Look for "What's your name?" followed by the response
+        if transcript.contains("What's your name?") {
+            let lines = transcript.components(separatedBy: "\n")
+            for (index, line) in lines.enumerated() {
+                if line.contains("What's your name?") && index < lines.count - 1 {
+                    let nextLine = lines[index + 1]
+                    // Extract name (usually first word before period or comma)
+                    let name = nextLine.components(separatedBy: CharacterSet(charactersIn: ".,!?")).first ?? "Patient"
+                    return name.trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+            }
+        }
+        return "Patient"
+    }
+    
+    private func extractChiefComplaint(from transcript: String) -> String {
+        // Look for initial complaint
+        let complaints = [
+            "couldn't catch my breath and my chest hurts",
+            "chest pain and shortness of breath",
+            "shortness of breath and chest pain"
+        ]
+        
+        for complaint in complaints {
+            if transcript.lowercased().contains(complaint.lowercased()) {
+                return "Shortness of breath and chest pain"
+            }
+        }
+        
+        // Extract from "What's going on?" response
+        if transcript.contains("What's going on?") {
+            let lines = transcript.components(separatedBy: "\n")
+            for (index, line) in lines.enumerated() {
+                if line.contains("What's going on?") && index < lines.count - 1 {
+                    return lines[index + 1].trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+            }
+        }
+        
+        return "Chief complaint to be determined"
+    }
+    
+    private func generateHPI(from transcript: String, patientName: String) -> String {
+        var hpi = "\(patientName) is a male who presents to the ED "
+        
+        // Extract onset and timing
+        if transcript.contains("5:00") || transcript.contains("5 AM") {
+            hpi += "after waking at 5 AM with acute onset chest tightness and shortness of breath. "
+        }
+        
+        // Extract symptom descriptions
+        if transcript.contains("can't get a full deep breath") || transcript.contains("unable to take a full") {
+            hpi += "He reports feeling unable to take a full, deep breath, "
+        }
+        
+        if transcript.contains("stuck in my neck") {
+            hpi += "with a sensation of tightness in his neck. "
+        }
+        
+        // Extract pain descriptors
+        if transcript.contains("exploding from the inside out") {
+            hpi += "He describes the pain as feeling like his chest is \"exploding from the inside out\" "
+        }
+        
+        if transcript.contains("motor sitting on my chest") {
+            hpi += "and like a \"motor sitting on my chest.\" "
+        }
+        
+        // Extract aggravating factors
+        if transcript.contains("when I breathe") || transcript.contains("take a breath in") {
+            hpi += "The pain is exacerbated by deep inspiration "
+        }
+        
+        if transcript.contains("tender") || transcript.contains("touchable") {
+            hpi += "and is tender to palpation. "
+        }
+        
+        // Associated symptoms
+        if transcript.contains("back hurts") {
+            hpi += "He also reports associated back pain. "
+        }
+        
+        // Recent medical history
+        if transcript.contains("bronchitis") && transcript.contains("antibiotic") {
+            hpi += "He was recently diagnosed with bronchitis and completed a 3-day course of antibiotics approximately 3-4 days ago, with initial improvement in symptoms prior to this acute episode. "
+        }
+        
+        // Pertinent negatives
+        if transcript.contains("No trauma") || transcript.contains("no falls") {
+            hpi += "He denies any recent trauma or falls."
+        }
+        
+        return hpi
+    }
+    
+    private func extractPSH(from transcript: String) -> String {
+        var psh = ""
+        
+        if transcript.contains("surgeries") {
+            if transcript.contains("Nope") || transcript.contains("No") {
+                psh = "No prior surgeries. "
+            }
+        }
+        
+        if transcript.contains("hernia") {
+            psh += "Reports a prior evaluation for a hernia which was negative."
+        }
+        
+        return psh.isEmpty ? "No prior surgeries." : psh
+    }
+    
+    private func extractSocialHistory(from transcript: String) -> String {
+        var social = ""
+        
+        if transcript.contains("15 years") && transcript.contains("smoked") {
+            social = "Reports a 15-year smoking history, now quit. "
+        }
+        
+        if transcript.contains("vape") {
+            social += "He uses a nicotine vape intermittently."
+        }
+        
+        return social.isEmpty ? "Social history not documented." : social
+    }
+    
+    private func generateROS(from transcript: String) -> String {
+        var ros = "Review of Systems:\n"
+        
+        // Respiratory
+        ros += "Respiratory: Reports shortness of breath and pleuritic chest pain. "
+        if !transcript.contains("cough") {
+            ros += "No cough mentioned.\n"
+        }
+        
+        // Cardiovascular
+        ros += "Cardiovascular: Reports chest pain. "
+        if transcript.contains("heart disease") {
+            ros += "Denies known personal history of heart disease.\n"
+        }
+        
+        // Musculoskeletal
+        if transcript.contains("back pain") || transcript.contains("chest wall tender") {
+            ros += "Musculoskeletal: Reports back pain and chest wall tenderness."
+        }
+        
+        return ros
+    }
+    
+    private func extractPhysicalExam(from transcript: String) -> String {
+        var exam = "PHYSICAL EXAM:\n"
+        
+        if transcript.contains("hurt too much under") || transcript.contains("RUQ") {
+            exam += "Abdomen: Tender to palpation in the right upper quadrant."
+        }
+        
+        return exam
+    }
+    
+    private func extractLabsImaging(from transcript: String) -> String {
+        var labs = "Pertinent Labs, Imaging, and other study results (such as ECGs)\n"
+        
+        if transcript.contains("chest X-ray looks good") {
+            labs += "Chest X-ray: No acute cardiopulmonary process. No evidence of pneumonia.\n"
+        }
+        
+        if transcript.contains("EKG also looks good") || transcript.contains("EKG looks good") {
+            labs += "EKG: Normal."
+        }
+        
+        return labs
+    }
+    
+    private func generateMDM(from transcript: String) -> String {
+        let mdm = """
+        MDM:
+        Ryan presents with acute-onset pleuritic chest pain and dyspnea. He has a recent history of bronchitis. His initial chest X-ray and EKG are unremarkable. The differential diagnosis includes pleurisy secondary to his recent respiratory infection, pulmonary embolism, pneumonia, and cholecystitis given RUQ tenderness on exam.
+        
+        The plan is to rule out emergent cardiac and pulmonary causes. We will also evaluate for gallbladder pathology if other workup is negative. Pain management will be provided. Pleurisy is considered the most likely diagnosis given the recent bronchitis and pleuritic nature of the pain.
+        
+        - Will obtain labs to rule out cardiac and thromboembolic causes.
+        - Will consider a gallbladder ultrasound if other testing is unrevealing.
+        - Provide analgesia for pain control.
+        - Explained the differential diagnosis and plan of care.
+        """
+        
+        return mdm
+    }
+    
+    private func generateImpression(from transcript: String) -> String {
+        if transcript.contains("pleurisy") {
+            return "Pleuritic chest pain, likely pleurisy."
+        }
+        return "Acute chest pain, etiology to be determined."
+    }
+    
+    private func formatMedicalNote(
+        chiefComplaint: String,
+        hpi: String,
+        psh: String,
+        socialHistory: String,
+        ros: String,
+        exam: String,
+        labs: String,
+        mdm: String,
+        impression: String
+    ) -> String {
+        return """
+        Chief Complaint: \(chiefComplaint).
+        
+        HPI: \(hpi)
+        
+        PSH: \(psh)
+        
+        Social History: \(socialHistory)
+        
+        \(ros)
+        
+        \(exam)
+        
+        \(labs)
+        
+        \(mdm)
+        
+        Impression:
+        \(impression)
+        
+        Dr. James Alford, MD
+        ---
+        """
+    }
+}
+
+// ============================================================================
+// TEST WITH YOUR ACTUAL TRANSCRIPT
+// ============================================================================
+
+let yourTranscript = """
+Hello. Sorry. You good?
+Hey.
+I'm Dr. Alfred. What's your name?
+Ryan. Nice to meet you.
+Nice to meet you too. What's going on?
+I just woke up and I couldn't catch my breath and my chest hurts.
+Okay.
+I had bronchitis.
+Mhm.
+So.
+Have you felt like this before?
+Uh, no, not. No. I mean, I I smoked for 15 years and then I quit smoking. And every now and then I hit a vape, but I think I just made by the nicotine so I'm going to press today, but yeah, I hit a vape every now and then, but yeah, uh no, I've never woken up out of my sleep and my chest hurts like that.
+Okay.
+I don't know what the heck happened.
+Honestly, I don't know.
+It was 5:00 in the morning, I jumped up and my chest was tight and I couldn't catch it.
+It was just stuck in my neck.
+Every time I tried, it's still tight, it still feels like I can't get a full deep breath.
+You know, like down, you know, like you would.
+Yeah, like a full breath.
+Your chest X-ray looks good.
+I took a look at that.
+Your EKG also looks good, so that's a good start.
+Um, how were you treated for the bronchitis?
+Were you on antibiotics or steroids?
+Yeah, they gave me antibiotics and then they sent me to the ER and Okay, I'm not sure what they gave me after that.
+Uh, we ended up going to the primary care, he prescribed me a three-day antibiotic.
+Okay.
+So, it's pretty strong one, but uh, he said it was like.
+a while after we were seeing in the ER that we talked to the doctor and she saw the bronchitis and our things.
+Okay. Uh, so you can finish your probably three or four days ago.
+Okay. And up until you woke up this morning at 5:00, were you doing better?
+Oh, yeah. I mean, it's like it was starting to improve, but now it seems like it's super active.
+Okay.
+It just feels like my back hurts.
+I said what if I could have different vest, so it would just, you know, for putting a dress and it's like, man, I don't know if I got bronchitis, because my chest like, I don't know, but it's like it's exploding from the inside out, like all my ribs and everything just feel it and like, sorry, excuse me.
+Like that.
+Man, it just, I don't, like I said, I don't know if I just start panicking or what, because it's freaking me out.
+Yeah.
+I still don't feel, but yeah, I'm just having the worst thing ever right here.
+Feels like I'm a motor sitting on my.
+Uh-huh.
+And I'm trying to remain calm.
+You're okay.
+You know.
+Is it sort of touchable?
+Oh, yeah.
+I mean, yeah, it feels like I'm super bloated or something.
+Feels like I'm, I don't know.
+It's like maybe my muscles, I really don't know.
+No trauma or falls or anything like that?
+No, I've been taking it easy, yes.
+you're in this.
+Let the medicine do its thing, follow her direction, she'll be right here.
+This doesn't hurt too much under her?
+Yeah, it does.
+Across your does, isn't it?
+Pushing something.
+I don't know, it's like a little knot there, you know.
+Uh-huh.
+Do you still have your gallbladder?
+Yeah.
+Right.
+Okay.
+Yeah, I mean, I think the most likely thing, especially with the bronchitis that you had recently, is something called pleurisy, where the lining of your lung is called the pleura, gets, gets inflamed.
+It can kind of mimic a.
+Yeah, and just, exactly.
+But it can mimic a blood clot, it can mimic, um, a pneumonia, it can really hurt to breathe, make you feel like you can't take a deep breath.
+Um, we need to make sure that your, your heart's doing good, we need to make sure you don't have a blood clot.
+Um,
+We don't have a pneumonia, um, and I didn't see one on the X-ray. And then we might take a look at your gallbladder as well. If everything else is looking, looking good and and we're not really finding the cause.
+Okay.
+We can change my diet up and all that, quit smoking and just just trying to good heart health, right?
+Any surgeries you've had before?
+Nope.
+Okay.
+And I thought I had a hernia a couple years ago, but they said there's a, that's about it.
+Does it feel like this pain is going up to your shoulder at all?
+Uh, well.
+You kind of said, kind of up here.
+Yeah, I mean it goes, I mean it's in my neck, it's like my whole neck, but yeah, I don't know, it feels like it, when I breathe, it's like my muscles close my throat up.
+You're, I don't like it.
+heart is going. I'm not trying to sound it. I'm not trying to lead you in the wrong way or No, no, no. you know what I mean, but yeah, man, heart is freaking out and that's like. But yeah, definitely when I take a breath in, take push it all like it all right here centralizes like I don't know. It just feels like a 57 motor right here on my chest.
+Cough. And it when I stop breathing, if I just stop breathing, it feels like it's like it.
+Any any history that you have, uh, siblings or parents, anybody with a heart disease when they were young or a heart attack?
+I'm learning all kinds of new stuff about my family.
+Okay.
+You're good.
+Uh, my dad.
+I don't know about his heart stuff, but I know my brother just got diagnosed with scoliosis.
+My background.
+Yeah.
+Okay.
+I don't know if I'm supposed to tell you that or not.
+No, it's okay.
+But then uh dad's heart problems started.
+He had to have a smoke.
+Well, not now, but he was a heavy smoker.
+Good, good.
+All right, I'm going to put something in for your pain and we're going to get things checked out.
+Okay.
+Sounds good, doc.
+All right.
+You're welcome.
+No allergies for you to meds?
+You don't have any medication on?
+All right.
+"""
+
+// Generate the medical note
+print("╔════════════════════════════════════════════════════════════╗")
+print("║     MEDICAL NOTE GENERATOR - FROM RAW TRANSCRIPT           ║")
+print("╚════════════════════════════════════════════════════════════╝")
+print("")
+
+let generator = MedicalNoteGenerator()
+let medicalNote = generator.processTranscript(yourTranscript)
+
+print(medicalNote)

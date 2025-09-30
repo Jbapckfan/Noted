@@ -89,9 +89,14 @@ class VoiceCommandService: NSObject, ObservableObject {
         recognitionTask = nil
         
         // Setup audio session
+        #if os(iOS)
         let audioSession = AVAudioSession.sharedInstance()
         try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
         try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+        #else
+        // macOS handles audio differently
+        print("✅ Using macOS audio configuration for voice commands")
+        #endif
         
         // Setup recognition request
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
@@ -100,13 +105,13 @@ class VoiceCommandService: NSObject, ObservableObject {
         }
         
         recognitionRequest.shouldReportPartialResults = true
-        recognitionRequest.requiresOnDeviceRecognition = false
+        recognitionRequest.requiresOnDeviceRecognition = true // Neural Engine for fastest voice commands
         
         // Setup audio engine
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
         
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
+        inputNode.installTap(onBus: 0, bufferSize: 256, format: recordingFormat) { buffer, _ in
             recognitionRequest.append(buffer)
         }
         
@@ -158,54 +163,156 @@ class VoiceCommandService: NSObject, ObservableObject {
     // MARK: - Command Parsing
     private func parseVoiceCommand(_ spokenText: String) -> VoiceCommand? {
         let text = spokenText.lowercased()
-        
-        // New encounter commands
-        if text.contains("start a new encounter") || text.contains("start new encounter") || text.contains("new encounter") {
-            return .newEncounter
+
+        // Start commands
+        if text.contains("start note") || text.contains("start encounter") {
+            return .startEncounter
         }
-        
-        if text.contains("stop this encounter") || text.contains("stop encounter") || text.contains("end encounter") {
+
+        // Stop commands
+        if text.contains("stop note") || text.contains("stop encounter") {
             return .stopEncounter
         }
-        
+
+        // Pause commands
+        if text.contains("pause note") || text.contains("pause encounter") {
+            return .pauseEncounter
+        }
+
+        // Resume commands
+        if text.contains("resume note") || text.contains("resume encounter") {
+            return .resumeEncounter
+        }
+
         // Bed-specific commands with regex
         if let bedCommand = parseBedCommand(text) {
             return bedCommand
         }
-        
+
         return nil
     }
     
     private func parseBedCommand(_ text: String) -> VoiceCommand? {
-        // "hey noted start a new note on bed 3 for chest pain"
-        let bedPattern = "hey noted.*bed (\\d+).*for (.+)"
-        if let regex = try? NSRegularExpression(pattern: bedPattern, options: .caseInsensitive) {
+        let lowerText = text.lowercased()
+
+        // "hey noted start note on trauma 1 for chest pain"
+        let traumaWithComplaintPattern = "hey noted.*start note on trauma ([12]).*for (.+)"
+        if let regex = try? NSRegularExpression(pattern: traumaWithComplaintPattern, options: .caseInsensitive) {
+            let range = NSRange(text.startIndex..<text.endIndex, in: text)
+            if let match = regex.firstMatch(in: text, options: [], range: range) {
+                if let traumaRange = Range(match.range(at: 1), in: text),
+                   let complaintRange = Range(match.range(at: 2), in: text) {
+                    let traumaNumber = String(text[traumaRange])
+                    let complaint = String(text[complaintRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    return .newPatientOnBed(bed: "Trauma \(traumaNumber)", complaint: complaint)
+                }
+            }
+        }
+
+        // "hey noted start note on trauma 1" (without complaint)
+        let traumaOnlyPattern = "hey noted.*start note on trauma ([12])"
+        if let regex = try? NSRegularExpression(pattern: traumaOnlyPattern, options: .caseInsensitive) {
+            let range = NSRange(text.startIndex..<text.endIndex, in: text)
+            if let match = regex.firstMatch(in: text, options: [], range: range) {
+                if let traumaRange = Range(match.range(at: 1), in: text) {
+                    let traumaNumber = String(text[traumaRange])
+                    return .newPatientOnBed(bed: "Trauma \(traumaNumber)", complaint: "")
+                }
+            }
+        }
+
+        // "hey noted start note on psych 10 for altered mental status" or "hey noted start note on bed 10 for psych"
+        if lowerText.contains("psych 10") || lowerText.contains("psych ten") ||
+           (lowerText.contains("bed 10") || lowerText.contains("bed ten")) {
+            let complaint = extractComplaintFromPsychCommand(text)
+            return .newPatientOnBed(bed: "Bed 10 (Psych)", complaint: complaint)
+        }
+
+        // "hey noted start note on fast track 3 for laceration" or "hey noted start note on FT 3"
+        let fastTrackWithComplaintPattern = "hey noted.*start note on (?:fast track|ft) ([1-5]).*for (.+)"
+        if let regex = try? NSRegularExpression(pattern: fastTrackWithComplaintPattern, options: .caseInsensitive) {
+            let range = NSRange(text.startIndex..<text.endIndex, in: text)
+            if let match = regex.firstMatch(in: text, options: [], range: range) {
+                if let ftRange = Range(match.range(at: 1), in: text),
+                   let complaintRange = Range(match.range(at: 2), in: text) {
+                    let ftNumber = String(text[ftRange])
+                    let complaint = String(text[complaintRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    return .newPatientOnBed(bed: "Fast Track \(ftNumber)", complaint: complaint)
+                }
+            }
+        }
+
+        // "hey noted start note on fast track 3" or "hey noted start note on FT 3" (without complaint)
+        let fastTrackOnlyPattern = "hey noted.*start note on (?:fast track|ft) ([1-5])"
+        if let regex = try? NSRegularExpression(pattern: fastTrackOnlyPattern, options: .caseInsensitive) {
+            let range = NSRange(text.startIndex..<text.endIndex, in: text)
+            if let match = regex.firstMatch(in: text, options: [], range: range) {
+                if let ftRange = Range(match.range(at: 1), in: text) {
+                    let ftNumber = String(text[ftRange])
+                    return .newPatientOnBed(bed: "Fast Track \(ftNumber)", complaint: "")
+                }
+            }
+        }
+
+        // "hey noted start note on bed 3-9, 11-12, 14 for chest pain"
+        let bedWithComplaintPattern = "hey noted.*start note on bed (\\d+).*for (.+)"
+        if let regex = try? NSRegularExpression(pattern: bedWithComplaintPattern, options: .caseInsensitive) {
             let range = NSRange(text.startIndex..<text.endIndex, in: text)
             if let match = regex.firstMatch(in: text, options: [], range: range) {
                 if let bedRange = Range(match.range(at: 1), in: text),
                    let complaintRange = Range(match.range(at: 2), in: text) {
                     let bedNumber = String(text[bedRange])
-                    let complaint = String(text[complaintRange])
-                    return .newPatientOnBed(bed: bedNumber, complaint: complaint)
+                    let complaint = String(text[complaintRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+
+                    // Validate bed number (3-10, 11-12, 14 - no 13)
+                    if isValidBedNumber(bedNumber) {
+                        let bedName = bedNumber == "10" ? "Bed 10 (Psych)" : "Bed \(bedNumber)"
+                        return .newPatientOnBed(bed: bedName, complaint: complaint)
+                    }
                 }
             }
         }
-        
-        // "hey noted trauma 1 for multiple trauma"
-        let traumaPattern = "hey noted.*trauma (\\d+).*for (.+)"
-        if let regex = try? NSRegularExpression(pattern: traumaPattern, options: .caseInsensitive) {
+
+        // "hey noted start note on bed 3" (without complaint)
+        let bedOnlyPattern = "hey noted.*start note on bed (\\d+)"
+        if let regex = try? NSRegularExpression(pattern: bedOnlyPattern, options: .caseInsensitive) {
             let range = NSRange(text.startIndex..<text.endIndex, in: text)
             if let match = regex.firstMatch(in: text, options: [], range: range) {
-                if let bedRange = Range(match.range(at: 1), in: text),
-                   let complaintRange = Range(match.range(at: 2), in: text) {
+                if let bedRange = Range(match.range(at: 1), in: text) {
                     let bedNumber = String(text[bedRange])
-                    let complaint = String(text[complaintRange])
-                    return .newPatientOnBed(bed: "Trauma \(bedNumber)", complaint: complaint)
+
+                    // Validate bed number (3-10, 11-12, 14 - no 13)
+                    if isValidBedNumber(bedNumber) {
+                        let bedName = bedNumber == "10" ? "Bed 10 (Psych)" : "Bed \(bedNumber)"
+                        return .newPatientOnBed(bed: bedName, complaint: "")
+                    }
                 }
             }
         }
-        
+
         return nil
+    }
+
+    private func extractComplaintFromPsychCommand(_ text: String) -> String {
+        if text.lowercased().contains(" for ") {
+            let components = text.lowercased().components(separatedBy: " for ")
+            if components.count > 1 {
+                return components[1].trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+        return ""
+    }
+
+    private func isValidBedNumber(_ bedNumber: String) -> Bool {
+        guard let number = Int(bedNumber) else { return false }
+
+        // Valid bed numbers: 3-10 (10=Psych), 11-12, 14 (no 13)
+        switch number {
+        case 3...12, 14:
+            return number != 13 // Exclude 13
+        default:
+            return false
+        }
     }
     
     // MARK: - Audio Feedback
@@ -215,12 +322,20 @@ class VoiceCommandService: NSObject, ObservableObject {
         
         if let command = command {
             switch command {
-            case .newEncounter:
-                utterance = AVSpeechUtterance(string: "Starting new encounter")
+            case .startEncounter:
+                utterance = AVSpeechUtterance(string: "Starting encounter")
             case .stopEncounter:
-                utterance = AVSpeechUtterance(string: "Encounter saved")
+                utterance = AVSpeechUtterance(string: "Encounter stopped")
+            case .pauseEncounter:
+                utterance = AVSpeechUtterance(string: "Encounter paused")
+            case .resumeEncounter:
+                utterance = AVSpeechUtterance(string: "Encounter resumed")
             case .newPatientOnBed(let bed, let complaint):
-                utterance = AVSpeechUtterance(string: "Starting \(bed) for \(complaint)")
+                if complaint.isEmpty {
+                    utterance = AVSpeechUtterance(string: "Starting note on \(bed)")
+                } else {
+                    utterance = AVSpeechUtterance(string: "Starting \(bed) for \(complaint)")
+                }
             }
         } else {
             utterance = AVSpeechUtterance(string: "Command not recognized")
@@ -242,6 +357,7 @@ class VoiceCommandService: NSObject, ObservableObject {
             throw VoiceCommandError.speechPermissionDenied
         }
         
+        #if os(iOS)
         let audioStatus = await withCheckedContinuation { continuation in
             AVAudioSession.sharedInstance().requestRecordPermission { granted in
                 continuation.resume(returning: granted)
@@ -250,21 +366,32 @@ class VoiceCommandService: NSObject, ObservableObject {
         guard audioStatus else {
             throw VoiceCommandError.audioPermissionDenied
         }
+        #else
+        // macOS handles permissions differently
+        // Permission requests are handled at the system level
+        print("✅ macOS audio permissions handled by system")
+        #endif
     }
 }
 
 // MARK: - Voice Commands
 enum VoiceCommand: CustomStringConvertible {
-    case newEncounter
+    case startEncounter
     case stopEncounter
+    case pauseEncounter
+    case resumeEncounter
     case newPatientOnBed(bed: String, complaint: String)
-    
+
     var description: String {
         switch self {
-        case .newEncounter:
-            return "New Encounter"
+        case .startEncounter:
+            return "Start Encounter"
         case .stopEncounter:
             return "Stop Encounter"
+        case .pauseEncounter:
+            return "Pause Encounter"
+        case .resumeEncounter:
+            return "Resume Encounter"
         case .newPatientOnBed(let bed, let complaint):
             return "New Patient on \(bed) - \(complaint)"
         }

@@ -1,0 +1,529 @@
+import Foundation
+import NaturalLanguage
+import CoreML
+
+/// Enhanced medical note generator with Apple Intelligence integration
+class UpdatedMedicalNoteGenerator: ObservableObject {
+    static let shared = UpdatedMedicalNoteGenerator()
+    
+    @Published var isProcessing = false
+    @Published var progress: Float = 0.0
+    @Published var currentStage = ""
+    
+    private let summarizerService = ProductionMedicalSummarizerService()
+    private let entityExtractor = MedicalEntityExtractor()
+    private let vocabularyEnhancer = MedicalVocabularyEnhancer()
+    private let redFlagService = MedicalRedFlagService()
+    
+    // Note format templates
+    private let noteFormats: [NoteType: NoteTemplate] = [
+        .soap: SOAPTemplate(),
+        .progress: ProgressNoteTemplate(),
+        .procedure: ProcedureNoteTemplate(),
+        .discharge: DischargeTemplate(),
+        .consultation: ConsultationTemplate(),
+        .edNote: EDNoteTemplate()
+    ]
+    
+    // MARK: - Main Generation Method
+    
+    func generateNote(
+        from transcript: String,
+        noteType: NoteType,
+        patientInfo: PatientInfo? = nil,
+        settings: GenerationSettings = GenerationSettings()
+    ) async -> GeneratedNote {
+        
+        isProcessing = true
+        progress = 0.0
+        currentStage = "Initializing..."
+        
+        do {
+            // Step 1: Clean and enhance transcript
+            currentStage = "Processing transcript..."
+            progress = 0.2
+            let cleanedTranscript = await cleanTranscript(transcript)
+            
+            // Step 2: Extract medical entities
+            currentStage = "Extracting medical information..."
+            progress = 0.4
+            let entities = await extractMedicalEntities(from: cleanedTranscript)
+            
+            // Step 3: Check for red flags
+            currentStage = "Analyzing critical findings..."
+            progress = 0.5
+            let redFlags = await analyzeRedFlags(transcript: cleanedTranscript, entities: entities)
+            
+            // Step 4: Generate structured note
+            currentStage = "Generating medical note..."
+            progress = 0.7
+            let structuredNote = await generateStructuredNote(
+                transcript: cleanedTranscript,
+                entities: entities,
+                noteType: noteType,
+                patientInfo: patientInfo,
+                settings: settings
+            )
+            
+            // Step 5: Apply template formatting
+            currentStage = "Formatting note..."
+            progress = 0.9
+            let formattedNote = formatNote(
+                structuredNote,
+                template: noteFormats[noteType],
+                redFlags: redFlags
+            )
+            
+            progress = 1.0
+            currentStage = "Complete"
+            isProcessing = false
+            
+            return GeneratedNote(
+                content: formattedNote,
+                type: noteType,
+                entities: entities,
+                redFlags: redFlags,
+                metadata: NoteMetadata(
+                    generatedAt: Date(),
+                    modelVersion: settings.modelType.rawValue,
+                    processingTime: Date().timeIntervalSince(Date())
+                )
+            )
+            
+        } catch {
+            print("Error generating note: \(error)")
+            isProcessing = false
+            currentStage = "Error occurred"
+            
+            // Return fallback note
+            return GeneratedNote(
+                content: formatFallbackNote(transcript, noteType: noteType),
+                type: noteType,
+                entities: [],
+                redFlags: [],
+                metadata: NoteMetadata(
+                    generatedAt: Date(),
+                    modelVersion: "fallback",
+                    processingTime: 0
+                )
+            )
+        }
+    }
+    
+    // MARK: - Processing Steps
+    
+    private func cleanTranscript(_ transcript: String) async -> String {
+        // Apply vocabulary enhancement
+        var cleaned = vocabularyEnhancer.enhanceMedicalTerms(in: transcript)
+        
+        // Remove filler words
+        let fillerWords = ["um", "uh", "like", "you know", "basically", "actually"]
+        for filler in fillerWords {
+            cleaned = cleaned.replacingOccurrences(
+                of: "\\b\(filler)\\b",
+                with: "",
+                options: [.regularExpression, .caseInsensitive]
+            )
+        }
+        
+        // Normalize whitespace
+        cleaned = cleaned.replacingOccurrences(
+            of: "\\s+",
+            with: " ",
+            options: .regularExpression
+        )
+        
+        return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    private func extractMedicalEntities(from transcript: String) async -> [MedicalEntity] {
+        return await entityExtractor.extract(from: transcript)
+    }
+    
+    private func analyzeRedFlags(transcript: String, entities: [MedicalEntity]) async -> [RedFlag] {
+        return await redFlagService.analyzeForRedFlags(
+            transcript: transcript,
+            entities: entities
+        )
+    }
+    
+    private func generateStructuredNote(
+        transcript: String,
+        entities: [MedicalEntity],
+        noteType: NoteType,
+        patientInfo: PatientInfo?,
+        settings: GenerationSettings
+    ) async -> StructuredNote {
+        
+        // Use Apple Intelligence for note generation
+        let generatedContent = await summarizerService.generateMedicalNote(
+            from: transcript,
+            noteType: noteType,
+            modelType: settings.modelType,
+            includeVitals: settings.includeVitals,
+            includeMedications: settings.includeMedications
+        )
+        
+        // Parse into structured sections
+        return parseIntoStructure(
+            generatedContent,
+            noteType: noteType,
+            entities: entities,
+            patientInfo: patientInfo
+        )
+    }
+    
+    private func parseIntoStructure(
+        _ content: String,
+        noteType: NoteType,
+        entities: [MedicalEntity],
+        patientInfo: PatientInfo?
+    ) -> StructuredNote {
+        
+        var sections: [String: String] = [:]
+        
+        // Extract sections based on note type
+        switch noteType {
+        case .soap:
+            sections = parseSOAPSections(content)
+        case .progress:
+            sections = parseProgressNoteSections(content)
+        case .edNote:
+            sections = parseEDNoteSections(content)
+        case .discharge:
+            sections = parseDischargeSections(content)
+        case .consultation:
+            sections = parseConsultationSections(content)
+        case .procedure:
+            sections = parseProcedureSections(content)
+        }
+        
+        return StructuredNote(
+            sections: sections,
+            entities: entities,
+            patientInfo: patientInfo,
+            noteType: noteType
+        )
+    }
+    
+    private func formatNote(
+        _ structuredNote: StructuredNote,
+        template: NoteTemplate?,
+        redFlags: [RedFlag]
+    ) -> String {
+        
+        var formatted = ""
+        
+        // Add header if patient info available
+        if let patient = structuredNote.patientInfo {
+            formatted += formatHeader(patient)
+            formatted += "\n" + String(repeating: "-", count: 60) + "\n\n"
+        }
+        
+        // Add red flags if any
+        if !redFlags.isEmpty {
+            formatted += "⚠️ CRITICAL FINDINGS:\n"
+            for flag in redFlags {
+                formatted += "• \(flag.description) (Severity: \(flag.severity))\n"
+            }
+            formatted += "\n" + String(repeating: "-", count: 60) + "\n\n"
+        }
+        
+        // Apply template formatting
+        if let template = template {
+            formatted += template.format(structuredNote)
+        } else {
+            // Default formatting
+            for (section, content) in structuredNote.sections {
+                formatted += "\(section.uppercased()):\n\(content)\n\n"
+            }
+        }
+        
+        // Add metadata footer
+        formatted += "\n" + String(repeating: "-", count: 60) + "\n"
+        formatted += "Generated: \(Date().formatted())\n"
+        formatted += "Note Type: \(structuredNote.noteType.rawValue)\n"
+        
+        return formatted
+    }
+    
+    private func formatFallbackNote(_ transcript: String, noteType: NoteType) -> String {
+        return """
+        \(noteType.rawValue.uppercased())
+        
+        ENCOUNTER TRANSCRIPT:
+        \(transcript)
+        
+        Note: This is a fallback transcription. AI note generation was unavailable.
+        Please review and edit as needed.
+        
+        Generated: \(Date().formatted())
+        """
+    }
+    
+    private func formatHeader(_ patient: PatientInfo) -> String {
+        return """
+        Patient: \(patient.name ?? "Unknown")
+        MRN: \(patient.mrn ?? "N/A")
+        DOB: \(patient.dateOfBirth ?? "N/A")
+        Date: \(Date().formatted())
+        """
+    }
+    
+    // MARK: - Section Parsers
+    
+    private func parseSOAPSections(_ content: String) -> [String: String] {
+        var sections: [String: String] = [:]
+        
+        let sectionMarkers = [
+            "Subjective": ["subjective:", "s:", "chief complaint:", "history:"],
+            "Objective": ["objective:", "o:", "physical exam:", "vitals:"],
+            "Assessment": ["assessment:", "a:", "diagnosis:", "impression:"],
+            "Plan": ["plan:", "p:", "treatment:", "follow-up:"]
+        ]
+        
+        for (sectionName, markers) in sectionMarkers {
+            for marker in markers {
+                if let range = content.range(of: marker, options: .caseInsensitive) {
+                    let startIndex = range.upperBound
+                    // Find next section or end
+                    var endIndex = content.endIndex
+                    for (_, nextMarkers) in sectionMarkers {
+                        for nextMarker in nextMarkers {
+                            if let nextRange = content.range(of: nextMarker, options: .caseInsensitive, range: startIndex..<content.endIndex),
+                               nextRange.lowerBound > startIndex {
+                                endIndex = min(endIndex, nextRange.lowerBound)
+                            }
+                        }
+                    }
+                    sections[sectionName] = String(content[startIndex..<endIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    break
+                }
+            }
+        }
+        
+        // If no sections found, treat entire content as assessment
+        if sections.isEmpty {
+            sections["Assessment"] = content
+        }
+        
+        return sections
+    }
+    
+    private func parseProgressNoteSections(_ content: String) -> [String: String] {
+        return [
+            "Events Since Last Note": extractSection(from: content, markers: ["events:", "interval history:", "since last:"]),
+            "Current Status": extractSection(from: content, markers: ["current:", "status:", "today:"]),
+            "Physical Exam": extractSection(from: content, markers: ["exam:", "physical:", "pe:"]),
+            "Assessment/Plan": extractSection(from: content, markers: ["assessment:", "plan:", "a/p:"])
+        ]
+    }
+    
+    private func parseEDNoteSections(_ content: String) -> [String: String] {
+        return [
+            "Chief Complaint": extractSection(from: content, markers: ["chief complaint:", "cc:", "presenting:"]),
+            "History of Present Illness": extractSection(from: content, markers: ["hpi:", "history:", "present illness:"]),
+            "Review of Systems": extractSection(from: content, markers: ["ros:", "review:", "systems:"]),
+            "Physical Exam": extractSection(from: content, markers: ["exam:", "physical:", "pe:"]),
+            "ED Course": extractSection(from: content, markers: ["course:", "ed course:", "treatment:"]),
+            "Medical Decision Making": extractSection(from: content, markers: ["mdm:", "decision:", "assessment:"]),
+            "Disposition": extractSection(from: content, markers: ["disposition:", "dispo:", "discharge:"])
+        ]
+    }
+    
+    private func parseDischargeSections(_ content: String) -> [String: String] {
+        return [
+            "Admission Diagnosis": extractSection(from: content, markers: ["admission:", "admitted for:"]),
+            "Discharge Diagnosis": extractSection(from: content, markers: ["discharge diagnosis:", "final:"]),
+            "Hospital Course": extractSection(from: content, markers: ["course:", "hospital course:"]),
+            "Discharge Instructions": extractSection(from: content, markers: ["instructions:", "discharge instructions:"]),
+            "Follow-up": extractSection(from: content, markers: ["follow-up:", "followup:", "follow up:"])
+        ]
+    }
+    
+    private func parseConsultationSections(_ content: String) -> [String: String] {
+        return [
+            "Reason for Consultation": extractSection(from: content, markers: ["reason:", "consult for:"]),
+            "History": extractSection(from: content, markers: ["history:", "hpi:"]),
+            "Examination": extractSection(from: content, markers: ["exam:", "physical:"]),
+            "Impression": extractSection(from: content, markers: ["impression:", "assessment:"]),
+            "Recommendations": extractSection(from: content, markers: ["recommendations:", "recommend:", "plan:"])
+        ]
+    }
+    
+    private func parseProcedureSections(_ content: String) -> [String: String] {
+        return [
+            "Procedure": extractSection(from: content, markers: ["procedure:", "operation:"]),
+            "Indication": extractSection(from: content, markers: ["indication:", "reason:"]),
+            "Technique": extractSection(from: content, markers: ["technique:", "method:"]),
+            "Findings": extractSection(from: content, markers: ["findings:", "found:"]),
+            "Complications": extractSection(from: content, markers: ["complications:", "adverse:"]),
+            "Post-procedure": extractSection(from: content, markers: ["post:", "recovery:"])
+        ]
+    }
+    
+    private func extractSection(from content: String, markers: [String]) -> String {
+        for marker in markers {
+            if let range = content.range(of: marker, options: .caseInsensitive) {
+                let startIndex = range.upperBound
+                // Find next section marker or take reasonable chunk
+                let endRange = content.index(startIndex, offsetBy: 500, limitedBy: content.endIndex) ?? content.endIndex
+                let section = String(content[startIndex..<endRange])
+                
+                // Clean up and return first paragraph or until next section
+                if let nextLineBreak = section.firstIndex(of: "\n\n") {
+                    return String(section[..<nextLineBreak]).trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+                return section.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+        return ""
+    }
+}
+
+// MARK: - Supporting Types
+
+struct GeneratedNote {
+    let content: String
+    let type: NoteType
+    let entities: [MedicalEntity]
+    let redFlags: [RedFlag]
+    let metadata: NoteMetadata
+}
+
+struct NoteMetadata {
+    let generatedAt: Date
+    let modelVersion: String
+    let processingTime: TimeInterval
+}
+
+struct GenerationSettings {
+    var modelType: ModelType = .balanced
+    var includeVitals = true
+    var includeMedications = true
+    var includeRedFlags = true
+    var formatStyle: FormatStyle = .professional
+    
+    enum FormatStyle {
+        case concise
+        case standard
+        case professional
+        case detailed
+    }
+}
+
+struct StructuredNote {
+    let sections: [String: String]
+    let entities: [MedicalEntity]
+    let patientInfo: PatientInfo?
+    let noteType: NoteType
+}
+
+// MARK: - Templates
+
+protocol NoteTemplate {
+    func format(_ note: StructuredNote) -> String
+}
+
+struct SOAPTemplate: NoteTemplate {
+    func format(_ note: StructuredNote) -> String {
+        var result = "SOAP NOTE\n\n"
+        
+        let sectionOrder = ["Subjective", "Objective", "Assessment", "Plan"]
+        for section in sectionOrder {
+            if let content = note.sections[section], !content.isEmpty {
+                result += "\(section.uppercased()):\n\(content)\n\n"
+            }
+        }
+        
+        return result
+    }
+}
+
+struct ProgressNoteTemplate: NoteTemplate {
+    func format(_ note: StructuredNote) -> String {
+        var result = "PROGRESS NOTE\n\n"
+        
+        for (section, content) in note.sections {
+            if !content.isEmpty {
+                result += "\(section):\n\(content)\n\n"
+            }
+        }
+        
+        return result
+    }
+}
+
+struct EDNoteTemplate: NoteTemplate {
+    func format(_ note: StructuredNote) -> String {
+        var result = "EMERGENCY DEPARTMENT NOTE\n\n"
+        
+        let sectionOrder = [
+            "Chief Complaint",
+            "History of Present Illness",
+            "Review of Systems",
+            "Physical Exam",
+            "ED Course",
+            "Medical Decision Making",
+            "Disposition"
+        ]
+        
+        for section in sectionOrder {
+            if let content = note.sections[section], !content.isEmpty {
+                result += "\(section):\n\(content)\n\n"
+            }
+        }
+        
+        return result
+    }
+}
+
+struct DischargeTemplate: NoteTemplate {
+    func format(_ note: StructuredNote) -> String {
+        var result = "DISCHARGE SUMMARY\n\n"
+        
+        let sectionOrder = [
+            "Admission Diagnosis",
+            "Discharge Diagnosis",
+            "Hospital Course",
+            "Discharge Instructions",
+            "Follow-up"
+        ]
+        
+        for section in sectionOrder {
+            if let content = note.sections[section], !content.isEmpty {
+                result += "\(section):\n\(content)\n\n"
+            }
+        }
+        
+        return result
+    }
+}
+
+struct ConsultationTemplate: NoteTemplate {
+    func format(_ note: StructuredNote) -> String {
+        var result = "CONSULTATION NOTE\n\n"
+        
+        for (section, content) in note.sections {
+            if !content.isEmpty {
+                result += "\(section):\n\(content)\n\n"
+            }
+        }
+        
+        return result
+    }
+}
+
+struct ProcedureNoteTemplate: NoteTemplate {
+    func format(_ note: StructuredNote) -> String {
+        var result = "PROCEDURE NOTE\n\n"
+        
+        for (section, content) in note.sections {
+            if !content.isEmpty {
+                result += "\(section):\n\(content)\n\n"
+            }
+        }
+        
+        return result
+    }
+}

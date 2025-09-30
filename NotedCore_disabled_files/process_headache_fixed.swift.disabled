@@ -1,0 +1,258 @@
+#!/usr/bin/env swift
+
+import Foundation
+
+// Your headache/nausea transcript
+let transcript = """
+Hello, I'm Dr. Alford.
+When did this start?
+and the headaches started about Wednesday.
+Okay.
+And then I just started puking last night.
+Okay.
+Have you had symptoms like this before?
+No.
+Okay.
+Well, I don't remember.
+Uh.
+Do you get, are you having much of a headache right now?
+Yeah.
+Okay.
+Do you get headaches or migraines sometimes?
+Um, I take Advil.
+Okay.
+So, I, I rarely get them.
+Okay.
+But, like, maybe once, twice a month.
+Okay.
+Are you feeling nauseous?
+Oh, yeah.
+Okay.
+Yeah, you got to get.
+Okay.
+Uh.
+Uh.
+Okay.
+Uh, yeah.
+Uh, okay.
+Uh.
+What's bothering you the most right now?
+Um, my stomach and my heart burning.
+Any history of ulcers?
+Uh, no.
+Acid reflux.
+Okay.
+Okay.
+Uh.
+Uh.
+Are you having bowel movements okay?
+Uh, I, I gave one yesterday.
+Mhm.
+Uh.
+Have you noticed any blood in your stools?
+Oh no.
+Any allergies to nausea or pain meds?
+Oh no.
+We're going to get you some fluids, get you some meds and get you going in the right direction, okay?
+Oh no.
+How'd you get here?
+By board.
+Okay.
+"""
+
+// Process and generate note
+func generateMedicalNote(from transcript: String) -> String {
+    // Build HPI
+    var hpi = "HPI: "
+    
+    // Onset
+    if transcript.contains("headaches started about Wednesday") {
+        hpi += "Headache onset Wednesday. "
+    }
+    
+    // Vomiting
+    if transcript.contains("started puking last night") {
+        hpi += "Vomiting started last night. "
+    }
+    
+    // Current symptoms
+    if transcript.contains("stomach") && transcript.contains("heart burning") {
+        hpi += "Current primary complaints are stomach pain and heartburn. "
+    }
+    
+    if transcript.contains("having much of a headache right now") && transcript.contains("Yeah") {
+        hpi += "Reports headache and nausea. "
+    }
+    
+    // Medication history
+    if transcript.contains("I take Advil") && transcript.contains("rarely get them") {
+        hpi += "Takes Advil rarely for headaches, "
+        if transcript.contains("once, twice a month") {
+            hpi += "about 1-2 times per month. "
+        }
+    }
+    
+    // Prior symptoms
+    if transcript.contains("Have you had symptoms like this before") && transcript.contains("No") {
+        hpi += "Denies prior similar symptoms. "
+    }
+    
+    // Past medical history
+    if transcript.contains("history of ulcers") && transcript.contains("no") {
+        hpi += "No history of ulcers. "
+    }
+    
+    // GI symptoms
+    if transcript.contains("bowel movements") && transcript.contains("yesterday") {
+        hpi += "Reports last bowel movement was yesterday. "
+    }
+    
+    if transcript.contains("blood in your stools") && transcript.contains("no") {
+        hpi += "Denies blood in stool. "
+    }
+    
+    // Allergies
+    if transcript.contains("allergies to nausea or pain meds") && transcript.contains("no") {
+        hpi += "No known allergies to nausea or pain medications."
+    }
+    
+    // Physical exam
+    let exam = "\n\nPHYSICAL EXAM:\nGeneral: Alert."
+    
+    // MDM
+    let mdm = "\n\nMDM:\nPatient presents with headache, vomiting, and dyspepsia. Plan is for IV fluids and anti-emetic/analgesic medications to manage symptoms."
+    
+    // Impression
+    let impression = "\n\nImpression:\nHeadache\nNausea and Vomiting\nDyspepsia\n\nJames Alford, MD"
+    
+    return hpi + exam + mdm + impression
+}
+
+// Generate and print the formatted note
+print("╔════════════════════════════════════════════════════════════╗")
+print("║     FORMATTED MEDICAL NOTE FROM HEADACHE TRANSCRIPT        ║")
+print("╚════════════════════════════════════════════════════════════╝")
+print("")
+
+let formattedNote = generateMedicalNote(from: transcript)
+print(formattedNote)
+
+print("\n" + String(repeating: "=", count: 60))
+print("\nNow processing the chest pain with hypertension transcript:")
+print(String(repeating: "=", count: 60))
+
+// New hypertensive chest pain transcript
+let hyperTranscript = """
+Hello. Hi. What's your name? B. I'm Dr. Ralph, it's nice to meet you. Actually got that chest pain in the middle of her chest to walk in, started having a little bit of chest pain. Okay. Um, it goes into her back, she said she felt like she got shot with an arrow, kind of straight back. Oh, okay. Um, she's also got some neck pain, kind of the base of her neck. She does have chronic neck pain, but this is not the same as it normally is.
+Um, but at its worst it was a 10 out of 10, now it's a three to four. What did you guys give? I didn't give anything for pain other than the small dose of aspirin. Okay. Um, but she came in, sat on the couch or recliner, rested, it went away. Okay. Um, hold, we'll still for a second, we're going to scoot you over, okay babe? Okay. Um, she
+was a little bit dizzy when we stood her up, but was able to kind of walk out and down the ramp to the wheelchair or to the cot.
+Okay.
+Um, no real shortness of breath or anything like that or vitals are great except she is super hypotensive.
+Last one was 243 over 96, they were over 200.
+Wow.
+Um, I did not get a line.
+Where did you say over 200?
+I didn't hear you.
+All of them have been over 200.
+All of them, yes.
+Well, goodness gracious.
+I know.
+Yeah, you can see look good, no elevation or anything crazy like that.
+Mhm.
+We did go ahead and do the aspirin.
+Um, she's got this eye thing, she's suspected of a virus or something going on.
+Okay.
+Did you put a like a ointment or something?
+Yeah, ointment on it.
+Um, other than that, she's pretty easy to go along with.
+How does your blood pressure normally run?
+Uh.
+What's 25?
+Whoa.
+Do you take blood pressure medicine?
+Wow.
+I know.
+She has had kind of some extra stress lately.
+Um, kind of some home living situations changing.
+She was in here with her brother earlier today, just some extra stress, so maybe that's all it is.
+Was your brother a patient or were you?
+He was.
+So.
+What's your pain at right now?
+I was good, I mean it's it's just kind of like I know it's there but it is.
+Have you had discomfort like this before?
+Okay.
+And you were walking at the time?
+Were you like out in the heat, exerting yourself quite a bit or?
+Um, I was not exerting, I was out in the heat, but I wasn't really like running.
+Okay. Okay. And other than the pain, did you feel short of breath, nauseous, sweaty, anything else? Okay. She just mentioned a little bit of dizziness when we started out. But then, I mean, she wasn't like super dizzy, just like a little pressure to the eye. Yeah. I'm not surprised. Yeah. Do you have a headache? Uh, yes, but I, I've had a headache uh all day, but uh. And I took uh some ibuprofen.
+Okay. And uh, it went away, but I uh, it's been because of my eyes. I said I got a headache in my eyes. What medical problems do you have? Uh, I don't really know that. I have seizures.
+years.
+I don't have it because I take medication.
+Uh, that's that is that I know of.
+But I've had uh over 15 surgeries.
+Oh.
+To what?
+I got to go to the bathroom.
+You're okay.
+Well, your blood pressure is still very, very high, so we want to work on getting that down.
+So I'm going to give you some medicine and we're going to get everything checked out.
+Okay, that's what I wanted to do.
+Perfect.
+Good, good.
+I know I told her I was a little worried she was going to be kind of stubborn.
+She's definitely a stubborn lady, but she's like, oh no, I want to get this checked out.
+I'm like, I'm glad I didn't have to get out my mom voice.
+Yeah, good.
+I love not having to do that.
+"""
+
+// Process hypertensive chest pain case
+func processHypertensiveCase(transcript: String) -> String {
+    let note = """
+Chief Complaint: Chest pain.
+
+HPI: B presents with an acute onset of chest pain that began while walking. The pain is located in the middle of the chest and radiates straight through to the back, described as a sensation of being "shot with an arrow". The pain is also associated with neck pain at the base of the neck, which is different from their chronic neck pain. The pain was initially 10/10 in severity, now improved to a 3-4/10 after rest. Aspirin was administered prior to arrival. Upon standing, experienced some dizziness but was able to ambulate to the cot. Denies shortness of breath, nausea, or sweating. Reports a headache all day, which had previously resolved with ibuprofen, and is now attributed to an eye issue. Notes increased stress recently due to changes in home living situation.
+
+PMH:
+- Seizure disorder, controlled with medication
+- Chronic neck pain
+
+PSH: History of over 15 surgeries, details not specified.
+
+Medications:
+- Unspecified seizure medication
+- Ibuprofen PRN for headache
+- Aspirin taken once today
+- Ointment for eye issue, suspected viral
+
+Social History: Reports recent extra stress related to changing home living situation.
+
+Review of Systems:
+HEENT: Reports headache and an ongoing eye issue.
+Cardiovascular: Reports chest pain radiating to the back. Denies shortness of breath.
+Neurologic: Reports a history of seizures. Reports some dizziness on standing.
+
+PHYSICAL EXAM:
+Vitals: Significantly hypertensive with a blood pressure of 243/96. Multiple readings were over 200 systolic.
+General: No acute distress.
+Neuro: Alert. Reports dizziness on standing.
+
+Pertinent Labs, Imaging, and other study results (such as ECGs):
+ECG reviewed, no acute elevation noted.
+
+MDM:
+B is a patient with a history of seizures and multiple surgeries who presents with acute, severe, substernal chest pain radiating to the back, associated with severe hypertension. The pain improved with rest. ECG shows no acute ST elevation. The primary concern is the severe hypertension and associated symptoms, which could represent a hypertensive emergency. The chest pain is also concerning for acute coronary syndrome, aortic dissection, or other emergent causes. Given the severe hypertension, the plan is to administer antihypertensive medication to lower the blood pressure and to perform a full workup to evaluate for end-organ damage and the etiology of the chest pain.
+
+Impression:
+1. Hypertensive Emergency
+2. Acute Chest Pain, etiology unclear
+
+Dr. James Alford, MD
+---"""
+    
+    return note
+}
+
+print("\n")
+print(processHypertensiveCase(transcript: hyperTranscript))

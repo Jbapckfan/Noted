@@ -4,10 +4,34 @@
 <dict>
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
-    <!-- ... other existing keys ... -->
+
+    <!-- Microphone Permission -->
     <key>NSMicrophoneUsageDescription</key>
-    <string>Noted requires microphone access to transcribe medical conversations.</string>
+    <string>Noted requires microphone access to transcribe medical conversations in real-time using on-device AI.</string>
+
+    <!-- Speech Recognition Permission -->
     <key>NSSpeechRecognitionUsageDescription</key>
-    <string>Noted requires speech recognition to provide accurate medical transcription services.</string>
+    <string>Noted uses on-device speech recognition to provide accurate medical transcription services. All processing happens locally on your iPhone.</string>
+
+    <!-- Background Audio for Continuous Recording -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>audio</string>
+    </array>
+
+    <!-- Optimization for A18 Pro Neural Engine -->
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+        <string>arm64</string>
+        <string>metal</string>
+    </array>
+
+    <!-- Privacy - Local Processing Only -->
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+
+    <!-- Prevent automatic low power mode interference -->
+    <key>UIApplicationExitsOnSuspend</key>
+    <false/>
 </dict>
 </plist>

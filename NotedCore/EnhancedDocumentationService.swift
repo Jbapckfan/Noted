@@ -8,9 +8,10 @@ class EnhancedDocumentationService: ObservableObject {
     @Published var billingAnalysis = BillingAnalysis()
     @Published var qualityMetrics = QualityMetrics()
     
-    private var phi3Service: Phi3MLXService {
-        return Phi3MLXService.shared
-    }
+    // Disabled Phi3MLXService - not available
+    // private var phi3Service: Phi3MLXService {
+    //     return Phi3MLXService.shared
+    // }
     
     struct DocumentationOptions {
         var includeLabValues = true
@@ -48,14 +49,14 @@ class EnhancedDocumentationService: ObservableObject {
     func generateEnhancedNote(transcription: String, format: DocumentationFormat) async {
         let enhancedPrompt = buildEnhancedPrompt(transcription: transcription, format: format)
         
-        // Use the existing Phi-3 service with enhanced prompting
-        let baseNote = await phi3Service.generateMedicalNote(
-            from: transcription,
-            noteType: format.medicalFormat
-        )
+        // Phi3 service disabled - use simple generation instead
+        // let baseNote = await phi3Service.generateMedicalNote(
+        //     from: transcription,
+        //     noteType: format.medicalFormat
+        // )
         
-        // Apply enhancements
-        var enhancedNote = baseNote
+        // Apply enhancements - start with transcription for now
+        var enhancedNote = "Medical Note:\n\n" + transcription
         
         if options.includeLabValues {
             enhancedNote = addLabValues(to: enhancedNote)

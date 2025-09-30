@@ -1,0 +1,336 @@
+import SwiftUI
+
+struct SessionHistoryView: View {
+    @StateObject private var sessionManager = EncounterSessionManager.shared
+    @State private var selectedSession: EncounterSession?
+    @State private var showingSessionDetail = false
+    @State private var searchText = ""
+    
+    var filteredSessions: [EncounterSession] {
+        if searchText.isEmpty {
+            return sessionManager.sessionHistory.reversed()
+        } else {
+            return sessionManager.sessionHistory.filter {
+                $0.patientID.localizedCaseInsensitiveContains(searchText) ||
+                $0.transcript.localizedCaseInsensitiveContains(searchText)
+            }.reversed()
+        }
+    }
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                // Search Bar
+                SearchBar(text: $searchText)
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                
+                if filteredSessions.isEmpty {
+                    emptyStateView
+                } else {
+                    sessionsList
+                }
+            }
+            .navigationTitle("Session History")
+            .navigationBarTitleDisplayMode(.large)
+            .sheet(item: $selectedSession) { session in
+                SessionDetailView(session: session)
+            }
+        }
+    }
+    
+    private var emptyStateView: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 60))
+                .foregroundColor(.secondary)
+            
+            Text("No Sessions Yet")
+                .font(.title2)
+                .fontWeight(.semibold)
+            
+            Text("Your recorded sessions will appear here")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
+    }
+    
+    private var sessionsList: some View {
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                ForEach(filteredSessions) { session in
+                    SessionCard(session: session)
+                        .onTapGesture {
+                            selectedSession = session
+                        }
+                }
+            }
+            .padding()
+        }
+    }
+}
+
+// MARK: - Session Card
+struct SessionCard: View {
+    let session: EncounterSession
+    
+    private var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: session.startTime)
+    }
+    
+    private var duration: String {
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.minute, .second]
+        formatter.zeroFormattingBehavior = .pad
+        return formatter.string(from: session.duration) ?? "00:00"
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(session.patientID)
+                        .font(.headline)
+                    Text(formattedDate)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 4) {
+                    Label(duration, systemImage: "clock")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    if session.generatedNote != nil {
+                        Label("Note", systemImage: "doc.text.fill")
+                            .font(.caption2)
+                            .foregroundColor(.green)
+                    }
+                }
+            }
+            
+            // Transcript Preview
+            if !session.transcript.isEmpty {
+                Text(session.transcript)
+                    .lineLimit(2)
+                    .font(.system(.body, design: .rounded))
+                    .foregroundColor(.secondary)
+            }
+            
+            // Tags
+            HStack {
+                if let noteType = session.selectedNoteType {
+                    Tag(noteType.displayName, color: .blue)
+                }
+                
+                if session.phases.count > 1 {
+                    Tag("\(session.phases.count) phases", color: .purple)
+                }
+                
+                if session.editedTranscript != nil {
+                    Tag("Edited", color: .orange)
+                }
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.secondarySystemBackground))
+        )
+    }
+}
+
+// MARK: - Session Detail View
+struct SessionDetailView: View {
+    let session: EncounterSession
+    @Environment(\.dismiss) var dismiss
+    @State private var selectedTab = 0
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                // Tab Selector
+                Picker("View", selection: $selectedTab) {
+                    Text("Transcript").tag(0)
+                    Text("Note").tag(1)
+                    Text("Details").tag(2)
+                }
+                .pickerStyle(SegmentedPickerStyle())
+                .padding()
+                
+                // Content
+                ScrollView {
+                    switch selectedTab {
+                    case 0:
+                        transcriptView
+                    case 1:
+                        noteView
+                    case 2:
+                        detailsView
+                    default:
+                        EmptyView()
+                    }
+                }
+            }
+            .navigationTitle("Session Details")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Done") { dismiss() }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    ShareLink(item: session.generatedNote ?? session.transcript)
+                }
+            }
+        }
+    }
+    
+    private var transcriptView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Transcript")
+                .font(.headline)
+            
+            Text(session.editedTranscript ?? session.transcript)
+                .font(.system(.body, design: .rounded))
+                .textSelection(.enabled)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    
+    private var noteView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if let note = session.generatedNote {
+                Text("Generated Note")
+                    .font(.headline)
+                
+                Text(note)
+                    .font(.system(.body, design: .rounded))
+                    .textSelection(.enabled)
+            } else {
+                VStack(spacing: 20) {
+                    Image(systemName: "doc.text")
+                        .font(.largeTitle)
+                        .foregroundColor(.secondary)
+                    
+                    Text("No note generated")
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding()
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    
+    private var detailsView: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            DetailRow(label: "Patient ID", value: session.patientID)
+            DetailRow(label: "Start Time", value: formatDate(session.startTime))
+            DetailRow(label: "Duration", value: formatDuration(session.duration))
+            DetailRow(label: "Room", value: session.room ?? "Not specified")
+            
+            if let noteType = session.selectedNoteType {
+                DetailRow(label: "Note Type", value: noteType.displayName)
+            }
+            
+            DetailRow(label: "Phases", value: "\(session.phases.count)")
+            
+            if let metadata = session.metadata {
+                Divider()
+                Text("Metadata")
+                    .font(.headline)
+                    .padding(.top)
+                
+                ForEach(Array(metadata.keys.sorted()), id: \.self) { key in
+                    DetailRow(label: key, value: "\(metadata[key] ?? "")")
+                }
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .long
+        formatter.timeStyle = .medium
+        return formatter.string(from: date)
+    }
+    
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.hour, .minute, .second]
+        formatter.unitsStyle = .full
+        return formatter.string(from: duration) ?? "0 seconds"
+    }
+}
+
+// MARK: - Supporting Views
+struct SearchBar: View {
+    @Binding var text: String
+    
+    var body: some View {
+        HStack {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.secondary)
+            
+            TextField("Search sessions...", text: $text)
+                .textFieldStyle(PlainTextFieldStyle())
+            
+            if !text.isEmpty {
+                Button(action: { text = "" }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color(.tertiarySystemFill))
+        )
+    }
+}
+
+struct Tag: View {
+    let text: String
+    let color: Color
+    
+    var body: some View {
+        Text(text)
+            .font(.caption2)
+            .fontWeight(.medium)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(color.opacity(0.2))
+            .foregroundColor(color)
+            .cornerRadius(6)
+    }
+}
+
+struct DetailRow: View {
+    let label: String
+    let value: String
+    
+    var body: some View {
+        HStack {
+            Text(label)
+                .foregroundColor(.secondary)
+            Spacer()
+            Text(value)
+                .fontWeight(.medium)
+        }
+    }
+}

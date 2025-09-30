@@ -538,7 +538,9 @@ struct HandoffCreationView: View {
             }
             .padding()
             .navigationTitle("Provider Handoff")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
         }
     }
 }
@@ -556,7 +558,7 @@ struct SBARSection: View {
             TextEditor(text: $content)
                 .frame(height: 80)
                 .padding(8)
-                .background(Color(.systemGray6))
+                .background(Color.gray.opacity(0.1))
                 .cornerRadius(8)
         }
     }

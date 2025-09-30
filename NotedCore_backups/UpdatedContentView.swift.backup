@@ -1,0 +1,75 @@
+import SwiftUI
+
+struct ContentView: View {
+    @EnvironmentObject var appState: CoreAppState
+    @StateObject private var speechService = SpeechRecognitionService()
+    @StateObject private var summarizerService = ProductionMedicalSummarizerService()
+    @State private var currentTranscript = ""
+    @State private var generatedNote = ""
+    @State private var selectedTab = 0
+    
+    var body: some View {
+        TabView(selection: $selectedTab) {
+            // Main Medical Encounter View
+            ProfessionalEncounterView()
+                .tabItem {
+                    Label("Encounter", systemImage: "stethoscope")
+                }
+                .tag(0)
+            
+            // Sessions History
+            SessionHistoryView()
+                .tabItem {
+                    Label("History", systemImage: "clock.arrow.circlepath")
+                }
+                .tag(1)
+            
+            // Templates
+            TemplatesCommunityView()
+                .tabItem {
+                    Label("Templates", systemImage: "doc.text")
+                }
+                .tag(2)
+            
+            // Settings
+            SettingsView()
+                .tabItem {
+                    Label("Settings", systemImage: "gear")
+                }
+                .tag(3)
+        }
+        .onAppear {
+            initializeApp()
+        }
+    }
+    
+    private func initializeApp() {
+        // Initialize core services
+        appState.initialize()
+        
+        // Request permissions
+        speechService.requestAuthorization()
+        
+        // Setup audio session
+        AudioCaptureService.shared.setupAudioSession()
+        
+        // Load saved settings
+        loadUserSettings()
+    }
+    
+    private func loadUserSettings() {
+        // Load user preferences
+        if let selectedModel = UserDefaults.standard.string(forKey: "selectedWhisperModel") {
+            appState.selectedWhisperModel = selectedModel
+        }
+        
+        if let noteType = UserDefaults.standard.string(forKey: "defaultNoteType") {
+            appState.defaultNoteType = NoteType(rawValue: noteType) ?? .soap
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+        .environmentObject(CoreAppState())
+}

@@ -1,7 +1,12 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 struct EnhancedDocumentationView: View {
-    @ObservedObject var appState = CoreAppState.shared
+    @StateObject private var appState = CoreAppState.shared
     @StateObject private var documentationService = EnhancedDocumentationService()
     @State private var selectedFormat: DocumentationFormat = .soap
     @State private var isGenerating = false
@@ -14,8 +19,8 @@ struct EnhancedDocumentationView: View {
                 // Premium background
                 LinearGradient(
                     gradient: Gradient(colors: [
-                        Color(.systemBackground),
-                        Color(.systemGray6).opacity(0.3)
+                        Color.gray.opacity(0.05),
+                        Color.gray.opacity(0.1).opacity(0.3)
                     ]),
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
@@ -57,7 +62,7 @@ struct EnhancedDocumentationView: View {
         .onAppear {
             documentationService.analyzeTranscription(appState.transcription)
         }
-        .onChange(of: appState.transcription) { _, newValue in
+        .onChange(of: appState.transcription) { newValue in
             documentationService.analyzeTranscription(newValue)
         }
     }
@@ -317,14 +322,19 @@ struct EnhancedDocumentationView: View {
                     .font(.system(.body, design: .monospaced))
                     .textSelection(.enabled)
                     .padding(16)
-                    .background(Color(.systemGray6))
+                    .background(Color.gray.opacity(0.1))
                     .cornerRadius(12)
             }
             .frame(maxHeight: 400)
             
             HStack {
                 Button("Copy") {
+                    #if os(iOS)
                     UIPasteboard.general.string = appState.medicalNote
+                    #else
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(appState.medicalNote, forType: .string)
+                    #endif
                 }
                 .buttonStyle(SecondaryButtonStyle())
                 
@@ -433,7 +443,7 @@ struct DocumentationStyleCard: View {
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(isSelected ? Color.blue : Color(.systemGray6))
+                    .fill(isSelected ? Color.blue : Color.gray.opacity(0.1))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
                             .stroke(isSelected ? .clear : .blue.opacity(0.3), lineWidth: 1)

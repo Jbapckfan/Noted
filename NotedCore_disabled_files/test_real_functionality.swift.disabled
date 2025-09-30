@@ -1,0 +1,322 @@
+#!/usr/bin/env swift
+
+import Foundation
+
+print("""
+╔════════════════════════════════════════════════════════════╗
+║        NOTEDCORE REAL SUMMARIZATION TEST                    ║
+║         Test with actual transcriptions!                    ║
+╚════════════════════════════════════════════════════════════╝
+""")
+
+// Function to process transcription and generate HPI
+func generateHPI(transcript: String, chiefComplaint: String, age: Int? = nil, sex: String? = nil) -> String {
+    var hpi = ""
+    
+    // Opening with demographics
+    if let age = age, let sex = sex {
+        hpi = "\(age)-year-old \(sex) presents with \(chiefComplaint.lowercased()). "
+    } else {
+        hpi = "Patient presents with \(chiefComplaint.lowercased()). "
+    }
+    
+    let sentences = transcript.components(separatedBy: CharacterSet(charactersIn: ".!?"))
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty }
+    
+    // Extract onset
+    for sentence in sentences {
+        let lower = sentence.lowercased()
+        if lower.contains("started") || lower.contains("began") || lower.contains("ago") || 
+           lower.contains("woke up") || lower.contains("sudden") {
+            hpi += sentence + ". "
+            break
+        }
+    }
+    
+    // Extract quality
+    let qualityWords = ["sharp", "dull", "burning", "stabbing", "throbbing", "aching", 
+                        "crushing", "pressure", "squeezing", "cramping", "constant", "intermittent"]
+    for sentence in sentences {
+        let lower = sentence.lowercased()
+        for quality in qualityWords {
+            if lower.contains(quality) {
+                if !hpi.contains(sentence) {
+                    hpi += sentence + ". "
+                }
+                break
+            }
+        }
+    }
+    
+    // Extract location and radiation
+    for sentence in sentences {
+        let lower = sentence.lowercased()
+        if (lower.contains("located") || lower.contains("location") || lower.contains("radiates") || 
+            lower.contains("radiation")) && !hpi.contains(sentence) {
+            hpi += sentence + ". "
+        }
+    }
+    
+    // Extract severity
+    for sentence in sentences {
+        let lower = sentence.lowercased()
+        if (lower.contains("out of") || lower.contains("/10") || lower.contains("severity") ||
+            lower.contains("mild") || lower.contains("moderate") || lower.contains("severe")) && 
+           !hpi.contains(sentence) {
+            hpi += sentence + ". "
+        }
+    }
+    
+    // Extract associated symptoms
+    for sentence in sentences {
+        let lower = sentence.lowercased()
+        if (lower.contains("associated") || lower.contains("also") || lower.contains("accompanied") ||
+            lower.contains("with")) && !hpi.contains(sentence) {
+            hpi += sentence + ". "
+        }
+    }
+    
+    // Extract aggravating/alleviating factors
+    for sentence in sentences {
+        let lower = sentence.lowercased()
+        if (lower.contains("worse") || lower.contains("better") || lower.contains("relief") ||
+            lower.contains("aggravated") || lower.contains("alleviated")) && !hpi.contains(sentence) {
+            hpi += sentence + ". "
+        }
+    }
+    
+    // Extract pertinent negatives
+    for sentence in sentences {
+        let lower = sentence.lowercased()
+        if (lower.contains("denies") || lower.contains("no ") || lower.contains("without")) && 
+           !hpi.contains(sentence) {
+            hpi += sentence + ". "
+        }
+    }
+    
+    return hpi
+}
+
+// Function to generate MDM
+func generateMDM(transcript: String, chiefComplaint: String) -> String {
+    let lower = transcript.lowercased()
+    let ccLower = chiefComplaint.lowercased()
+    
+    // Analyze complexity
+    let isAcute = lower.contains("sudden") || lower.contains("acute") || 
+                  lower.contains("started") || lower.contains("began")
+    
+    let highRiskComplaints = ["chest pain", "shortness of breath", "altered mental", 
+                               "syncope", "worst headache", "severe abdominal"]
+    let isHighRisk = highRiskComplaints.contains { ccLower.contains($0) || lower.contains($0) }
+    
+    let isUnstable = lower.contains("hypotensive") || lower.contains("tachycardic") || 
+                     lower.contains("hypoxic") || lower.contains("unstable")
+    
+    var mdm = "MEDICAL DECISION MAKING:\n\n"
+    
+    // Problem complexity
+    mdm += "Number and Complexity of Problems:\n"
+    if isUnstable {
+        mdm += "• 1 acute, unstable problem requiring immediate intervention\n"
+    } else if isAcute && isHighRisk {
+        mdm += "• 1 acute problem with potential for severe morbidity\n"
+    } else if isAcute {
+        mdm += "• 1 acute uncomplicated problem\n"
+    } else {
+        mdm += "• 1 stable chronic problem\n"
+    }
+    mdm += "\n"
+    
+    // Data complexity
+    mdm += "Amount/Complexity of Data:\n"
+    if isHighRisk {
+        mdm += "• Extensive data review required\n"
+        mdm += "• Multiple diagnostic studies indicated\n"
+        mdm += "• Consider specialty consultation\n"
+    } else {
+        mdm += "• Limited to moderate data review\n"
+        mdm += "• Basic diagnostic workup appropriate\n"
+    }
+    mdm += "\n"
+    
+    // Risk assessment
+    mdm += "Risk Assessment:\n"
+    if isHighRisk || isUnstable {
+        mdm += "• HIGH risk due to:\n"
+        mdm += "  - Potential for significant morbidity/mortality\n"
+        mdm += "  - Need for urgent/emergent intervention\n"
+    } else if isAcute {
+        mdm += "• MODERATE risk\n"
+        mdm += "  - Diagnostic uncertainty present\n"
+        mdm += "  - Prescription drug management\n"
+    } else {
+        mdm += "• LOW risk\n"
+        mdm += "  - Minimal risk of morbidity\n"
+    }
+    mdm += "\n"
+    
+    // Differential diagnosis
+    mdm += "Differential Diagnosis:\n"
+    let differentials = getDifferentials(for: chiefComplaint)
+    for (index, diff) in differentials.enumerated() {
+        mdm += "\(index + 1). \(diff)\n"
+    }
+    mdm += "\n"
+    
+    // MDM Level
+    let level = isHighRisk || isUnstable ? "HIGH (Level 5)" : 
+                isAcute ? "MODERATE (Level 4)" : "LOW (Level 3)"
+    mdm += "Overall MDM Complexity: \(level)"
+    
+    return mdm
+}
+
+// Get differentials based on chief complaint
+func getDifferentials(for chiefComplaint: String) -> [String] {
+    let cc = chiefComplaint.lowercased()
+    
+    if cc.contains("chest pain") {
+        return ["Acute coronary syndrome", "Pulmonary embolism", "Aortic dissection", 
+                "Pneumothorax", "Gastroesophageal reflux"]
+    } else if cc.contains("headache") {
+        return ["Migraine", "Tension headache", "Subarachnoid hemorrhage", 
+                "Meningitis", "Temporal arteritis"]
+    } else if cc.contains("abdominal pain") {
+        return ["Appendicitis", "Cholecystitis", "Pancreatitis", 
+                "Bowel obstruction", "Kidney stones"]
+    } else if cc.contains("shortness") || cc.contains("dyspnea") || cc.contains("breath") {
+        return ["Pneumonia", "Congestive heart failure", "COPD exacerbation", 
+                "Pulmonary embolism", "Asthma exacerbation"]
+    } else if cc.contains("fever") {
+        return ["Viral syndrome", "Bacterial infection", "Urinary tract infection",
+                "Pneumonia", "Sepsis"]
+    } else {
+        return ["Primary diagnosis under investigation", 
+                "Further evaluation required"]
+    }
+}
+
+// Sample transcriptions for testing
+let samples = [
+    (
+        complaint: "chest pain",
+        transcript: """
+        Patient is a 58-year-old male who presents with chest pain that started about 
+        2 hours ago while walking up stairs. The pain is described as crushing pressure 
+        in the center of his chest. It radiates to his left arm and jaw. Severity is 
+        8 out of 10. Associated with shortness of breath and diaphoresis. He took 
+        aspirin at home with minimal relief. Also notes nausea. Denies fever, cough, 
+        or recent illness. Has a history of hypertension and diabetes. Smokes 1 pack 
+        per day for 30 years.
+        """,
+        age: 58,
+        sex: "male"
+    ),
+    (
+        complaint: "severe headache", 
+        transcript: """
+        This is a 42-year-old woman with sudden onset of severe headache that started 
+        1 hour ago. She describes it as the worst headache of her life, like someone 
+        hit her in the back of the head with a bat. The pain is located in the occipital 
+        region and radiates down her neck. Severity is 10 out of 10. Associated with 
+        nausea, vomiting, and neck stiffness. She also notes photophobia. No relief 
+        with ibuprofen. Denies recent trauma, fever, or focal neurologic symptoms. 
+        No prior history of headaches like this.
+        """,
+        age: 42,
+        sex: "female"
+    )
+]
+
+// Main interaction
+print("\n📋 OPTIONS:")
+print("1. Test with your own transcription")
+print("2. Test with sample transcriptions")
+print("3. Exit")
+print("\nChoice (1-3): ", terminator: "")
+
+if let choice = readLine() {
+    switch choice {
+    case "1":
+        print("\n🏥 Enter Chief Complaint: ", terminator: "")
+        let complaint = readLine() ?? ""
+        
+        print("Patient Age (optional): ", terminator: "")
+        let ageStr = readLine() ?? ""
+        let age = Int(ageStr)
+        
+        print("Patient Sex (M/F, optional): ", terminator: "")
+        let sexInput = readLine() ?? ""
+        let sex = sexInput.uppercased() == "M" ? "male" : sexInput.uppercased() == "F" ? "female" : nil
+        
+        print("\n📝 Enter transcription (paste text, then press Enter twice):")
+        var transcript = ""
+        var emptyLineCount = 0
+        while let line = readLine() {
+            if line.isEmpty {
+                emptyLineCount += 1
+                if emptyLineCount >= 2 {
+                    break
+                }
+            } else {
+                emptyLineCount = 0
+                transcript += line + " "
+            }
+        }
+        
+        if !transcript.isEmpty {
+            print("\n" + "=" * 60)
+            print("⚡ GENERATING HPI...")
+            print("=" * 60)
+            let hpi = generateHPI(transcript: transcript, chiefComplaint: complaint, age: age, sex: sex)
+            print(hpi)
+            
+            print("\n" + "=" * 60)
+            print("📊 GENERATING MDM...")
+            print("=" * 60)
+            let mdm = generateMDM(transcript: transcript, chiefComplaint: complaint)
+            print(mdm)
+        }
+        
+    case "2":
+        for (index, sample) in samples.enumerated() {
+            print("\n" + "=" * 60)
+            print("📝 SAMPLE \(index + 1): \(sample.complaint.uppercased())")
+            print("=" * 60)
+            print("\nTranscription:")
+            print(sample.transcript)
+            
+            print("\n⚡ GENERATED HPI:")
+            print("-" * 40)
+            let hpi = generateHPI(transcript: sample.transcript, chiefComplaint: sample.complaint, 
+                                 age: sample.age, sex: sample.sex)
+            print(hpi)
+            
+            print("\n📊 GENERATED MDM:")
+            print("-" * 40)
+            let mdm = generateMDM(transcript: sample.transcript, chiefComplaint: sample.complaint)
+            print(mdm)
+            
+            if index < samples.count - 1 {
+                print("\nPress Enter to continue to next sample...", terminator: "")
+                _ = readLine()
+            }
+        }
+        
+    case "3":
+        print("\n👋 Exiting...")
+        exit(0)
+        
+    default:
+        print("Invalid choice")
+    }
+}
+
+// Extension for string operations
+extension String {
+    static func *(left: String, right: Int) -> String {
+        return String(repeating: left, count: right)
+    }
+}

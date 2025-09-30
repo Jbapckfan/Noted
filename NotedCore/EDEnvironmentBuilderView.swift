@@ -20,9 +20,11 @@ struct EDEnvironmentBuilderView: View {
             }
             .padding()
             .navigationTitle("ED Environment")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Menu {
                         Button("New Environment") {
                             showingNewEnvironment = true
@@ -88,7 +90,7 @@ struct EDEnvironmentBuilderView: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.gray.opacity(0.1))
         .cornerRadius(12)
     }
     
@@ -140,7 +142,7 @@ struct BedButton: View {
             .frame(maxWidth: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? bed.category.color.opacity(0.2) : Color(.systemGray6))
+                    .fill(isSelected ? bed.category.color.opacity(0.2) : Color.gray.opacity(0.1))
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(isSelected ? bed.category.color : Color.clear, lineWidth: 2)
@@ -221,15 +223,17 @@ struct EnvironmentEditorView: View {
                 }
             }
             .navigationTitle(editingEnvironment == nil ? "New Environment" : "Edit Environment")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         dismiss()
                     }
                 }
                 
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Save") {
                         saveEnvironment()
                     }

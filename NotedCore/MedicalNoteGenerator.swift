@@ -6,7 +6,7 @@ import Foundation
 final class MedicalNoteGenerator {
     static let shared = MedicalNoteGenerator()
     
-    private init() {}
+    init() {}
     
     // MARK: - Main Note Generation
     

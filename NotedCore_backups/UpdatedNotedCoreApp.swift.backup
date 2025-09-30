@@ -1,0 +1,108 @@
+import SwiftUI
+import AVFoundation
+
+@main
+struct NotedCoreApp: App {
+    @StateObject private var appState = CoreAppState()
+    @Environment(\.scenePhase) var scenePhase
+    
+    init() {
+        // Configure audio session
+        configureAudioSession()
+        
+        // Configure appearance
+        configureAppearance()
+        
+        // Register defaults
+        registerDefaults()
+    }
+    
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                .environmentObject(appState)
+                .onAppear {
+                    appState.initialize()
+                }
+                .onChange(of: scenePhase) { newPhase in
+                    handleScenePhaseChange(newPhase)
+                }
+        }
+    }
+    
+    // MARK: - Configuration
+    
+    private func configureAudioSession() {
+        do {
+            let audioSession = AVAudioSession.sharedInstance()
+            try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
+            try audioSession.setActive(true)
+        } catch {
+            print("Failed to configure audio session: \(error)")
+        }
+    }
+    
+    private func configureAppearance() {
+        // Configure navigation bar appearance
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor.systemBackground
+        appearance.titleTextAttributes = [.foregroundColor: UIColor.label]
+        appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.label]
+        
+        UINavigationBar.appearance().standardAppearance = appearance
+        UINavigationBar.appearance().compactAppearance = appearance
+        UINavigationBar.appearance().scrollEdgeAppearance = appearance
+        
+        // Configure tab bar appearance
+        let tabAppearance = UITabBarAppearance()
+        tabAppearance.configureWithOpaqueBackground()
+        tabAppearance.backgroundColor = UIColor.systemBackground
+        
+        UITabBar.appearance().standardAppearance = tabAppearance
+        UITabBar.appearance().scrollEdgeAppearance = tabAppearance
+    }
+    
+    private func registerDefaults() {
+        UserDefaults.standard.register(defaults: [
+            "selectedWhisperModel": "openai_whisper-base",
+            "defaultNoteType": "soap",
+            "autoSaveEnabled": true,
+            "speakerIdentificationEnabled": false,
+            "medicalVocabularyEnhanced": true,
+            "redFlagDetectionEnabled": true,
+            "continuousListeningEnabled": false
+        ])
+    }
+    
+    // MARK: - Scene Phase Management
+    
+    private func handleScenePhaseChange(_ phase: ScenePhase) {
+        switch phase {
+        case .active:
+            print("App became active")
+            // Resume any paused operations
+            if appState.isRecording {
+                appState.resumeRecording()
+            }
+            
+        case .inactive:
+            print("App became inactive")
+            // Pause recording if active
+            if appState.isRecording {
+                appState.pauseRecording()
+            }
+            
+        case .background:
+            print("App entered background")
+            // Save state and cleanup
+            appState.saveState()
+            if appState.currentEncounter != nil {
+                appState.saveCurrentEncounter()
+            }
+            
+        @unknown default:
+            break
+        }
+    }
+}

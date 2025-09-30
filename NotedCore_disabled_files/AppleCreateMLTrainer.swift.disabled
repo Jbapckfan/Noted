@@ -1,0 +1,229 @@
+import Foundation
+import CreateML
+#if canImport(CoreML)
+import CoreML
+#endif
+
+/// Apple CreateML Training Pipeline for Medical Summarization
+/// Trains a custom model using your transcript-summary pairs
+@available(macOS 12.0, *)
+class AppleCreateMLTrainer {
+
+    struct TrainingPair: Codable {
+        let transcript: String
+        let summary: String
+    }
+
+    // MARK: - Training
+
+    /// Train a custom medical summarization model using CreateML
+    static func trainMedicalSummarizationModel(
+        trainingData: [TrainingPair],
+        validationData: [TrainingPair]
+    ) throws -> MLTextClassifier {
+
+        print("🧠 Training Medical Summarization Model with CreateML...")
+        print("📊 Training samples: \(trainingData.count)")
+        print("✅ Validation samples: \(validationData.count)")
+
+        // Convert to CreateML format
+        let trainingTable = try MLDataTable(dictionary: [
+            "text": trainingData.map { $0.transcript },
+            "label": trainingData.map { $0.summary }
+        ])
+
+        let validationTable = try MLDataTable(dictionary: [
+            "text": validationData.map { $0.transcript },
+            "label": validationData.map { $0.summary }
+        ])
+
+        // Train text classifier (will be used for summarization)
+        let classifier = try MLTextClassifier(
+            trainingData: trainingTable,
+            textColumn: "text",
+            labelColumn: "label"
+        )
+
+        // Evaluate
+        let evaluation = classifier.evaluation(on: validationTable, textColumn: "text", labelColumn: "label")
+        print("✅ Training complete!")
+        print("📈 Validation Accuracy: \(evaluation.classificationError)")
+
+        return classifier
+    }
+
+    /// Load training data from your existing patterns and samples
+    static func loadTrainingData() -> ([TrainingPair], [TrainingPair]) {
+        var trainingPairs: [TrainingPair] = []
+
+        // Use EDTrainingDataGenerator to create samples
+        let generator = EDTrainingDataGenerator.shared
+        let samples = generator.generateTrainingSample(count: 500)
+
+        for sample in samples {
+            // Convert TrainingSample to TrainingPair
+            let pair = TrainingPair(
+                transcript: sample.transcript,
+                summary: convertJSONToSummary(sample.expectedJSON)
+            )
+            trainingPairs.append(pair)
+        }
+
+        // Add real-world examples if available
+        trainingPairs.append(contentsOf: getRealWorldExamples())
+
+        // Split 80/20 train/validation
+        let splitIndex = Int(Double(trainingPairs.count) * 0.8)
+        let training = Array(trainingPairs.prefix(splitIndex))
+        let validation = Array(trainingPairs.suffix(from: splitIndex))
+
+        return (training, validation)
+    }
+
+    private static func convertJSONToSummary(_ json: String) -> String {
+        // Convert structured JSON to narrative summary
+        guard let data = json.data(using: .utf8),
+              let dict = try? JSONDecoder().decode([String: Any].self, from: data) else {
+            return ""
+        }
+
+        // Build narrative summary from structured data
+        var summary = "**HISTORY OF PRESENT ILLNESS:**\n"
+
+        if let cc = dict["chiefComplaint"] as? String {
+            summary += "Chief Complaint: \(cc)\n"
+        }
+
+        if let onset = dict["onset"] as? String {
+            summary += "Onset: \(onset)\n"
+        }
+
+        if let severity = dict["severity"] as? String {
+            summary += "Severity: \(severity)\n"
+        }
+
+        if let symptoms = dict["associatedSymptoms"] as? [String], !symptoms.isEmpty {
+            summary += "Associated Symptoms: \(symptoms.joined(separator: ", "))\n"
+        }
+
+        summary += "\n**ASSESSMENT & PLAN:**\n"
+        summary += "Clinical evaluation and appropriate management per presenting complaint."
+
+        return summary
+    }
+
+    private static func getRealWorldExamples() -> [TrainingPair] {
+        // Add your actual real-world transcript-summary pairs here
+        return [
+            TrainingPair(
+                transcript: """
+                Patient presents with chest pain that started 2 hours ago.
+                Pain is sharp, 8 out of 10, radiating to left arm.
+                Associated with shortness of breath and sweating.
+                Patient has history of hypertension and takes lisinopril.
+                """,
+                summary: """
+                **HISTORY OF PRESENT ILLNESS:**
+                Patient is a middle-aged adult presenting with acute onset chest pain.
+                Pain began 2 hours prior to presentation, described as sharp in quality,
+                8/10 severity, with radiation to the left arm. Associated symptoms include
+                shortness of breath and diaphoresis.
+
+                **PAST MEDICAL HISTORY:**
+                Hypertension, currently treated with lisinopril.
+
+                **ASSESSMENT:**
+                Acute chest pain with concerning features. Differential includes acute
+                coronary syndrome, pulmonary embolism, aortic dissection.
+
+                **PLAN:**
+                Immediate cardiac workup including EKG, troponin, chest X-ray.
+                Aspirin administered. Cardiology consult requested.
+                """
+            ),
+
+            TrainingPair(
+                transcript: """
+                15 year old with headache for 3 days. Pounding, worse with light.
+                Nausea and vomiting. No fever. Had similar headaches before.
+                Takes ibuprofen which helps a little.
+                """,
+                summary: """
+                **HISTORY OF PRESENT ILLNESS:**
+                15-year-old patient presenting with headache of 3 days duration.
+                Pain is described as pounding in character, exacerbated by light exposure (photophobia).
+                Associated symptoms include nausea and vomiting. Patient denies fever.
+
+                **PAST MEDICAL HISTORY:**
+                History of similar headaches in the past.
+
+                **CURRENT MEDICATIONS:**
+                Ibuprofen as needed, with partial relief.
+
+                **ASSESSMENT:**
+                Migraine headache with typical features including photophobia and associated
+                nausea/vomiting.
+
+                **PLAN:**
+                Continue ibuprofen. Consider migraine-specific therapy if symptoms persist.
+                Trigger avoidance counseling. Follow-up with primary care for possible prophylaxis.
+                """
+            )
+        ]
+    }
+
+    // MARK: - Model Export
+
+    /// Save trained model to disk for app integration
+    static func saveModel(_ model: MLTextClassifier, to path: URL) throws {
+        let metadata = MLModelMetadata(
+            author: "NotedCore",
+            shortDescription: "Medical transcript summarization model",
+            version: "1.0"
+        )
+
+        try model.write(to: path, metadata: metadata)
+        print("✅ Model saved to: \(path.path)")
+    }
+
+    // MARK: - Inference
+
+    /// Use trained model to generate summary
+    static func generateSummary(from transcript: String, using model: MLTextClassifier) -> String {
+        do {
+            let prediction = try model.prediction(from: transcript)
+            return prediction
+        } catch {
+            print("❌ Prediction failed: \(error)")
+            return "Unable to generate summary"
+        }
+    }
+}
+
+// MARK: - Training Script
+
+/// Run this to train and export the model
+@available(macOS 12.0, *)
+func trainAndExportModel() {
+    print("🚀 Starting CreateML Training Pipeline...")
+
+    do {
+        // Load data
+        let (training, validation) = AppleCreateMLTrainer.loadTrainingData()
+
+        // Train model
+        let model = try AppleCreateMLTrainer.trainMedicalSummarizationModel(
+            trainingData: training,
+            validationData: validation
+        )
+
+        // Export to app bundle location
+        let outputPath = URL(fileURLWithPath: "/Users/jamesalford/Documents/NotedCore/NotedCore/MedicalSummarizer.mlmodel")
+        try AppleCreateMLTrainer.saveModel(model, to: outputPath)
+
+        print("🎉 Training complete! Model ready for integration.")
+
+    } catch {
+        print("❌ Training failed: \(error)")
+    }
+}

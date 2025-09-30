@@ -194,3 +194,9 @@ NotedCore.xcodeproj/project.xcworkspace/xcuserdata/
 NotedCore.xcodeproj/xcuserdata/# Large ML Models
 NotedCore/Models/*.mlx
 NotedCore/Models/*.mlmodel
+
+# Build artifacts
+build_*/
+*.app/
+WatchTestApp
+WatchTestApp.xcodeproj/

@@ -149,7 +149,7 @@ class BetterSummarizationModels: ObservableObject {
         
         // Load model with medical optimization
         modelStatus = "Loading \(model.rawValue)..."
-        let mlxModel = try await loadMLXModel(modelPath: modelPath, model: model)
+        _ = try await loadMLXModel(modelPath: modelPath, model: model)
         
         currentModel = model
         modelStatus = "✅ Using \(model.rawValue)"

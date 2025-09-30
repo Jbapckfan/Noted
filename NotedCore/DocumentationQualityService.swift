@@ -241,7 +241,7 @@ struct QualityStatusBadge: View {
                 }
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
-                .background(Color(.systemGray6))
+                .background(Color.gray.opacity(0.1))
                 .cornerRadius(8)
                 .onTapGesture {
                     showingDetails = true
@@ -290,7 +290,7 @@ struct QualityDetailsSheet: View {
                     Spacer()
                 }
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.gray.opacity(0.1))
                 .cornerRadius(8)
                 
                 // HPI Elements
@@ -336,9 +336,11 @@ struct QualityDetailsSheet: View {
             }
             .padding()
             .navigationTitle("Documentation Quality")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") {
                         dismiss()
                     }
@@ -398,10 +400,10 @@ struct TranscriptionViewWithQualityBar: View {
                 }
                 .frame(minHeight: 200)
             }
-            .background(Color(.systemGray6))
+            .background(Color.gray.opacity(0.1))
             .cornerRadius(8)
         }
-        .onChange(of: transcriptionText) { _, newValue in
+        .onChange(of: transcriptionText) { newValue in
             // Analyze transcription for quality
             qualityService.analyzeTranscription(newValue)
         }

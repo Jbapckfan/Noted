@@ -38,7 +38,9 @@ struct TemplateDetailView: View {
                 .padding()
             }
             .navigationTitle(template.name)
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 toolbarContent
             }
@@ -67,7 +69,7 @@ struct TemplateDetailView: View {
                     .foregroundColor(.secondary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(Color(.systemGray5))
+                    .background(Color.gray.opacity(0.2))
                     .cornerRadius(15)
                 
                 Spacer()
@@ -137,7 +139,7 @@ struct TemplateDetailView: View {
                         .fontWeight(.medium)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(Color(.systemGray5))
+                        .background(Color.gray.opacity(0.2))
                         .foregroundColor(.primary)
                         .cornerRadius(10)
                 }
@@ -216,7 +218,7 @@ struct TemplateDetailView: View {
                     .font(.system(.callout, design: .monospaced))
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(.systemGray6))
+                    .background(Color.gray.opacity(0.1))
                     .cornerRadius(8)
             }
             .frame(height: 200)
@@ -235,7 +237,7 @@ struct TemplateDetailView: View {
                         .font(.caption)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(Color(.systemGray5))
+                        .background(Color.gray.opacity(0.2))
                         .cornerRadius(15)
                 }
             }
@@ -245,13 +247,13 @@ struct TemplateDetailView: View {
     // MARK: - Toolbar
     private var toolbarContent: some ToolbarContent {
         Group {
-            ToolbarItem(placement: .navigationBarLeading) {
+            ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") {
                     dismiss()
                 }
             }
             
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .confirmationAction) {
                 Button(action: {
                     templateService.toggleFavorite(template)
                 }) {
@@ -292,7 +294,9 @@ struct ParameterInputView: View {
             case .text, .number, .measurement, .anatomicalLocation, .medication, .time:
                 TextField(parameter.displayName, text: $value)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
+                    #if os(iOS)
                     .keyboardType(parameter.type == .number ? .numberPad : .default)
+                    #endif
                 
             case .selection:
                 if let options = parameter.options {
@@ -304,7 +308,7 @@ struct ParameterInputView: View {
                     .pickerStyle(MenuPickerStyle())
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(Color(.systemGray6))
+                    .background(Color.gray.opacity(0.1))
                     .cornerRadius(8)
                 }
                 
@@ -312,7 +316,7 @@ struct ParameterInputView: View {
                 TextEditor(text: $value)
                     .frame(height: 80)
                     .padding(4)
-                    .background(Color(.systemGray6))
+                    .background(Color.gray.opacity(0.1))
                     .cornerRadius(8)
             }
         }
@@ -333,9 +337,11 @@ struct TemplatePreviewSheet: View {
                     .textSelection(.enabled)
             }
             .navigationTitle("Preview")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         dismiss()
                     }

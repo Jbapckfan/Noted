@@ -1,0 +1,270 @@
+import SwiftUI
+
+struct TestAppleIntelligenceSummaryView: View {
+    @StateObject private var summarizer = AppleIntelligenceSummarizer.shared
+    @State private var mockTranscription = """
+    So the patient comes in today, she's been having chest pain for about three hours now. 
+    She says it started when she was walking up the stairs at home. The pain is like a 
+    pressure, maybe 7 out of 10. She took some Tylenol about an hour ago but it didn't 
+    really help much.
+    
+    She's 58 years old, has high blood pressure, takes lisinopril 10mg daily. Also on 
+    metformin for her diabetes. She mentioned her father had a heart attack at 65.
+    
+    On exam, blood pressure is 165 over 95, heart rate 92, oxygen sat 97 on room air. 
+    She appears uncomfortable but not in acute distress. Lungs are clear to auscultation 
+    bilaterally. Heart sounds regular, no murmurs. No leg swelling.
+    
+    I'm thinking we need to get an EKG right away, check troponins, CBC, BMP. Given her 
+    risk factors and presentation, we should probably start her on aspirin 325mg and get 
+    cardiology involved. If the EKG shows any ST changes, we'll need to activate the cath lab.
+    
+    Oh, she also mentioned she's been having some shortness of breath with the chest pain, 
+    especially when walking. No nausea or vomiting though. The pain doesn't radiate to 
+    her arms or jaw.
+    
+    Let's also get a chest x-ray to rule out any pneumonia or other lung issues. And we 
+    should keep her NPO for now in case she needs to go to the cath lab. I'll talk to 
+    the attending about admission to the cardiac unit for monitoring.
+    """
+    
+    @State private var generatedSummary = ""
+    @State private var isProcessing = false
+    @State private var selectedNoteType = "SOAP"
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // Header
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Apple Intelligence Summarization Test")
+                            .font(.largeTitle)
+                            .bold()
+                        
+                        HStack {
+                            Image(systemName: summarizer.isAvailable ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                .foregroundColor(summarizer.isAvailable ? .green : .red)
+                            Text(summarizer.isAvailable ? "Apple Intelligence Available" : "Using Fallback (NaturalLanguage)")
+                                .font(.subheadline)
+                        }
+                    }
+                    .padding()
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(10)
+                    
+                    // Mock Transcription Section
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Mock Medical Transcription")
+                            .font(.headline)
+                        
+                        Text(mockTranscription)
+                            .font(.system(.body, design: .monospaced))
+                            .padding()
+                            .background(Color.blue.opacity(0.05))
+                            .cornerRadius(8)
+                    }
+                    .padding(.horizontal)
+                    
+                    // Note Type Selector
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Select Note Type")
+                            .font(.headline)
+                        
+                        Picker("Note Type", selection: $selectedNoteType) {
+                            Text("SOAP Note").tag("SOAP")
+                            Text("HPI").tag("HPI")
+                            Text("General").tag("General")
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                    }
+                    .padding(.horizontal)
+                    
+                    // Generate Button
+                    Button(action: {
+                        Task {
+                            await generateSummary()
+                        }
+                    }) {
+                        HStack {
+                            if isProcessing {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "wand.and.stars")
+                            }
+                            Text(isProcessing ? "Generating..." : "Generate Summary")
+                                .fontWeight(.semibold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(isProcessing ? Color.gray : Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                    }
+                    .disabled(isProcessing)
+                    .padding(.horizontal)
+                    
+                    // Generated Summary Section
+                    if !generatedSummary.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Text("Generated Summary")
+                                    .font(.headline)
+                                Spacer()
+                                Button(action: {
+                                    copyToClipboard()
+                                }) {
+                                    Image(systemName: "doc.on.doc")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            
+                            Text(generatedSummary)
+                                .font(.system(.body, design: .default))
+                                .padding()
+                                .background(Color.green.opacity(0.05))
+                                .cornerRadius(8)
+                                .textSelection(.enabled)
+                        }
+                        .padding(.horizontal)
+                    }
+                    
+                    // Error Display
+                    if let error = summarizer.error {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Error")
+                                .font(.headline)
+                                .foregroundColor(.red)
+                            
+                            Text(error)
+                                .font(.system(.body, design: .monospaced))
+                                .padding()
+                                .background(Color.red.opacity(0.05))
+                                .cornerRadius(8)
+                        }
+                        .padding(.horizontal)
+                    }
+                    
+                    // Quick Summary Test
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Quick Summary Test")
+                            .font(.headline)
+                        
+                        Button("Generate Quick Summary") {
+                            Task {
+                                await generateQuickSummary()
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .padding(.horizontal)
+                    
+                    Spacer(minLength: 50)
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+    
+    private func generateSummary() async {
+        isProcessing = true
+        generatedSummary = ""
+        
+        let summary = await summarizer.generateSummary(
+            from: mockTranscription,
+            noteType: selectedNoteType
+        )
+        
+        generatedSummary = summary
+        isProcessing = false
+    }
+    
+    private func generateQuickSummary() async {
+        isProcessing = true
+        
+        let quickSummary = await summarizer.quickSummary(from: mockTranscription)
+        
+        generatedSummary = "**Quick Summary:**\n\(quickSummary)"
+        isProcessing = false
+    }
+    
+    private func copyToClipboard() {
+        #if os(iOS)
+        UIPasteboard.general.string = generatedSummary
+        #else
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(generatedSummary, forType: .string)
+        #endif
+    }
+}
+
+// MARK: - Standalone Test Runner
+@main
+struct TestAppleIntelligenceApp: App {
+    var body: some Scene {
+        WindowGroup {
+            TestAppleIntelligenceSummaryView()
+        }
+    }
+}
+
+// MARK: - Command Line Test
+struct CommandLineTest {
+    static func runTest() async {
+        print("🔬 Testing Apple Intelligence Summarization")
+        print("=" * 50)
+        
+        let summarizer = AppleIntelligenceSummarizer.shared
+        
+        print("✓ Apple Intelligence Available: \(summarizer.isAvailable)")
+        
+        let mockTranscription = """
+        Patient is a 45-year-old male presenting with severe lower back pain that started 
+        yesterday morning after lifting heavy boxes at work. Pain is sharp, radiates down 
+        the left leg, rated 8 out of 10. He's been taking ibuprofen 600mg every 6 hours 
+        with minimal relief. No numbness or tingling. No bowel or bladder issues.
+        
+        Past medical history includes hypertension, on amlodipine 5mg daily. No previous 
+        back injuries. Works in a warehouse.
+        
+        On exam, vital signs stable. Positive straight leg raise test on the left at 
+        30 degrees. Strength intact, reflexes symmetric. Tender over L4-L5 region.
+        
+        Plan is to start muscle relaxants, continue NSAIDs, physical therapy referral. 
+        If no improvement in 2 weeks, will get MRI. Work note for light duty provided.
+        """
+        
+        print("\n📝 Original Transcription:")
+        print(mockTranscription)
+        print("\n" + "=" * 50)
+        
+        // Test SOAP Note
+        print("\n🏥 Generating SOAP Note...")
+        let soapNote = await summarizer.generateSummary(from: mockTranscription, noteType: "SOAP")
+        print(soapNote)
+        
+        // Test HPI
+        print("\n" + "=" * 50)
+        print("\n📋 Generating HPI...")
+        let hpiNote = await summarizer.generateSummary(from: mockTranscription, noteType: "HPI")
+        print(hpiNote)
+        
+        // Test Quick Summary
+        print("\n" + "=" * 50)
+        print("\n⚡ Generating Quick Summary...")
+        let quickSummary = await summarizer.quickSummary(from: mockTranscription)
+        print(quickSummary)
+        
+        print("\n" + "=" * 50)
+        print("✅ Test Complete")
+    }
+}
+
+// Extension to make string multiplication work
+extension String {
+    static func * (left: String, right: Int) -> String {
+        return String(repeating: left, count: right)
+    }
+}

@@ -183,7 +183,9 @@ struct MedicalSettingsView: View {
                 }
             }
             .navigationTitle("Medical Settings")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
+            #endif
         }
     }
 }

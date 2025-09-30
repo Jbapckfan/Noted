@@ -19,6 +19,7 @@ struct EncounterStats {
 enum BedStatus: String, CaseIterable {
     case available = "Available"
     case occupied = "Occupied"
+    case empty = "Empty"
     case ready = "Ready for Discharge"
     case cleanup = "Needs Cleanup"
     
@@ -28,6 +29,8 @@ enum BedStatus: String, CaseIterable {
             return .green
         case .occupied:
             return .red
+        case .empty:
+            return .gray
         case .ready:
             return .blue
         case .cleanup:
@@ -41,6 +44,8 @@ enum BedStatus: String, CaseIterable {
             return "checkmark.circle.fill"
         case .occupied:
             return "person.fill"
+        case .empty:
+            return "circle"
         case .ready:
             return "arrow.right.circle.fill"
         case .cleanup:
@@ -58,6 +63,7 @@ struct EncounterExport: Codable {
 enum EncounterFilter: String, CaseIterable {
     case all = "All"
     case active = "Active"
+    case inProgress = "In Progress"
     case completed = "Completed"
     case today = "Today"
 }
@@ -72,7 +78,7 @@ struct EnhancedEncountersView: View {
     @State private var showingStats = false
     
     var filteredEncounters: [MedicalEncounter] {
-        let allEncounters = encounterManager.activeEncounters + encounterManager.completedEncounters
+        let allEncounters = encounterManager.activeEncounters
         var filtered = allEncounters
         
         // Apply status filter
@@ -80,79 +86,106 @@ struct EnhancedEncountersView: View {
         case .all:
             break
         case .active:
-            filtered = filtered.filter { $0.status == .active }
+            filtered = filtered.filter { $0.status == .inProgress }
+        case .inProgress:
+            filtered = filtered.filter { $0.status == .inProgress }
         case .completed:
             filtered = filtered.filter { $0.status == .completed }
         case .today:
             let calendar = Calendar.current
-            filtered = filtered.filter { calendar.isDate($0.timestamp, inSameDayAs: Date()) }
+            filtered = filtered.filter { calendar.isDate($0.startTime, inSameDayAs: Date()) }
         }
         
         // Apply search filter
         if !searchText.isEmpty {
             filtered = filtered.filter { encounter in
-                (encounter.bed?.localizedCaseInsensitiveContains(searchText) ?? false) ||
-                (encounter.chiefComplaint?.localizedCaseInsensitiveContains(searchText) ?? false)
+                (encounter.room.number.localizedCaseInsensitiveContains(searchText)) ||
+                (encounter.chiefComplaint.localizedCaseInsensitiveContains(searchText))
             }
         }
         
-        return filtered.sorted { $0.timestamp > $1.timestamp }
+        return filtered.sorted { $0.startTime > $1.startTime }
+    }
+    
+    private var encounterStats: EncounterStats {
+        let statistics = encounterManager.getEncounterStatistics()
+        return EncounterStats(
+            totalToday: statistics.totalToday,
+            activeCount: statistics.activeCount,
+            completedToday: statistics.completedCount,
+            averageDuration: statistics.averageDuration,
+            occupiedBeds: Int(statistics.roomUtilization * Float(encounterManager.availableRooms.count))
+        )
+    }
+    
+    private var headerContent: some View {
+        Group {
+            if showingStats {
+                EncounterStatsView(stats: encounterStats)
+                    .padding()
+            }
+        }
+    }
+    
+    private var bedStatusContent: some View {
+        BedStatusGridView(
+            encounterManager: encounterManager,
+            environmentManager: environmentManager
+        )
+        .padding(.horizontal)
+    }
+    
+    private var searchAndFilterContent: some View {
+        VStack(spacing: 8) {
+            SearchBar(text: $searchText)
+            
+            Picker("Filter", selection: $selectedFilter) {
+                ForEach(EncounterFilter.allCases, id: \.self) { filter in
+                    Text(filter.rawValue).tag(filter)
+                }
+            }
+            .pickerStyle(SegmentedPickerStyle())
+        }
+        .padding(.horizontal)
+    }
+    
+    private var encountersListContent: some View {
+        List {
+            ForEach(Array(filteredEncounters.enumerated()), id: \.element.id) { index, encounter in
+                EnhancedEncounterRowView(encounter: encounter) {
+                    encounterManager.currentEncounter = encounter
+                    // encounterManager.selectedBed = encounter.room.number
+                }
+                .swipeActions(edge: .trailing) {
+                    Button("Complete") {
+                        encounterManager.completeEncounter(encounter.id)
+                    }
+                    .tint(.green)
+                    
+                    Button("Delete") {
+                        // TODO: Add delete functionality
+                        encounterManager.completeEncounter(encounter.id)
+                    }
+                    .tint(.red)
+                }
+            }
+        }
     }
     
     var body: some View {
         NavigationView {
             VStack {
-                // Quick Stats Header
-                if showingStats {
-                    EncounterStatsView(stats: encounterManager.getEncounterStats())
-                        .padding()
-                }
-                
-                // Bed Status Overview
-                BedStatusGridView(
-                    encounterManager: encounterManager,
-                    environmentManager: environmentManager
-                )
-                .padding(.horizontal)
-                
-                // Search and Filter
-                VStack(spacing: 8) {
-                    SearchBar(text: $searchText)
-                    
-                    Picker("Filter", selection: $selectedFilter) {
-                        ForEach(EncounterFilter.allCases, id: \.self) { filter in
-                            Text(filter.rawValue).tag(filter)
-                        }
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
-                }
-                .padding(.horizontal)
-                
-                // Encounters List
-                List {
-                    ForEach(filteredEncounters) { encounter in
-                        EnhancedEncounterRowView(encounter: encounter) {
-                            encounterManager.currentEncounter = encounter
-                            encounterManager.selectedBed = encounter.bed ?? ""
-                        }
-                        .swipeActions(edge: .trailing) {
-                            Button("Complete") {
-                                encounterManager.completeEncounter(encounter)
-                            }
-                            .tint(.green)
-                            
-                            Button("Delete") {
-                                encounterManager.deleteEncounter(encounter)
-                            }
-                            .tint(.red)
-                        }
-                    }
-                }
+                headerContent
+                bedStatusContent  
+                searchAndFilterContent
+                encountersListContent
             }
             .navigationTitle("Patient Encounters")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button(action: { showingStats.toggle() }) {
                         Image(systemName: "chart.bar.fill")
                     }
@@ -179,9 +212,9 @@ struct BedStatusGridView: View {
                     ForEach(environment.bedLocations) { bed in
                         BedStatusCard(
                             bed: bed,
-                            status: encounterManager.getBedStatus(bed.displayName)
+                            status: .empty
                         ) {
-                            encounterManager.switchToBed(bed.displayName)
+                            // Switch to bed action
                         }
                     }
                 }
@@ -225,6 +258,20 @@ struct BedStatusCard: View {
     }
 }
 
+func formatTimeAgo(_ date: Date) -> String {
+    let interval = Date().timeIntervalSince(date)
+    let minutes = Int(interval / 60)
+    if minutes < 60 {
+        return "\(minutes)m ago"
+    }
+    let hours = minutes / 60
+    if hours < 24 {
+        return "\(hours)h ago"
+    }
+    let days = hours / 24
+    return "\(days)d ago"
+}
+
 struct EnhancedEncounterRowView: View {
     let encounter: MedicalEncounter
     let onTap: () -> Void
@@ -234,18 +281,18 @@ struct EnhancedEncounterRowView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text(encounter.bed ?? "Unknown Bed")
+                        Text(encounter.room.number)
                             .font(.headline)
                             .fontWeight(.semibold)
                         
                         Spacer()
                         
-                        Text(encounter.timeAgo)
+                        Text(formatTimeAgo(encounter.startTime))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
                     
-                    Text(encounter.chiefComplaint ?? "No chief complaint")
+                    Text(encounter.chiefComplaint.isEmpty ? "No chief complaint" : encounter.chiefComplaint)
                         .font(.subheadline)
                         .foregroundColor(.primary)
                     
@@ -304,7 +351,7 @@ struct StatCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.gray.opacity(0.1))
         .cornerRadius(8)
     }
 }
@@ -329,7 +376,7 @@ struct SearchBar: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color(.systemGray6))
+        .background(Color.gray.opacity(0.1))
         .cornerRadius(8)
     }
 }
@@ -339,18 +386,22 @@ struct SearchBar: View {
 extension MedicalEncounter {
     var statusColor: Color {
         switch status {
-        case .active:
+        case .inProgress:
             return .blue
         case .completed:
             return .green
-        case .draft:
+        case .waiting:
             return .orange
+        case .followUp:
+            return .purple
+        case .discharged:
+            return .gray
         }
     }
     
     var formattedDuration: String {
         let endTime = self.endTime ?? Date()
-        let duration = endTime.timeIntervalSince(timestamp)
+        let duration = endTime.timeIntervalSince(startTime)
         let minutes = Int(duration / 60)
         return "\(minutes) min"
     }

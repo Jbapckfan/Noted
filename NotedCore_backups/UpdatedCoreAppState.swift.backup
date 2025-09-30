@@ -1,0 +1,266 @@
+import Foundation
+import SwiftUI
+import Combine
+
+@MainActor
+class CoreAppState: ObservableObject {
+    // MARK: - Published Properties
+    @Published var isRecording = false
+    @Published var currentTranscript = ""
+    @Published var generatedNote = ""
+    @Published var processingStatus = "Ready"
+    @Published var selectedWhisperModel = "openai_whisper-base"
+    @Published var defaultNoteType: NoteType = .soap
+    @Published var isProcessing = false
+    @Published var currentPatient: Patient?
+    @Published var currentEncounter: Encounter?
+    @Published var connectionStatus: ConnectionStatus = .disconnected
+    @Published var audioLevel: Float = 0.0
+    @Published var redFlags: [MedicalRedFlag] = []
+    
+    // MARK: - Services
+    let speechService = SpeechRecognitionService.shared
+    let summarizerService = ProductionMedicalSummarizerService()
+    let whisperService = ProductionWhisperService.shared
+    let patientService = PatientService.shared
+    let encounterManager = EncounterManager.shared
+    let redFlagService = MedicalRedFlagService.shared
+    let sessionManager = EncounterSessionManager.shared
+    
+    // MARK: - Enums
+    enum ConnectionStatus {
+        case connected
+        case connecting
+        case disconnected
+        case error(String)
+    }
+    
+    // MARK: - Initialization
+    func initialize() {
+        setupObservers()
+        configureServices()
+        loadSavedState()
+    }
+    
+    // MARK: - Recording Management
+    func startRecording() {
+        guard !isRecording else { return }
+        
+        isRecording = true
+        processingStatus = "Recording..."
+        
+        // Start session
+        sessionManager.startRecording()
+        
+        // Start speech recognition
+        speechService.startRecording { [weak self] text in
+            DispatchQueue.main.async {
+                self?.currentTranscript += text + " "
+                self?.sessionManager.processTranscription(text)
+            }
+        }
+        
+        // Monitor audio levels
+        startAudioLevelMonitoring()
+    }
+    
+    func stopRecording() {
+        guard isRecording else { return }
+        
+        isRecording = false
+        processingStatus = "Processing..."
+        
+        // Stop services
+        speechService.stopRecording()
+        sessionManager.stopRecording()
+        
+        // Generate note
+        Task {
+            await generateMedicalNote()
+        }
+    }
+    
+    func pauseRecording() {
+        sessionManager.pauseRecording()
+        processingStatus = "Paused"
+    }
+    
+    func resumeRecording() {
+        sessionManager.resumeRecording()
+        processingStatus = "Recording..."
+    }
+    
+    // MARK: - Note Generation
+    func generateMedicalNote() async {
+        isProcessing = true
+        processingStatus = "Generating note with AI..."
+        
+        await summarizerService.generateMedicalNote(
+            from: currentTranscript,
+            noteType: defaultNoteType,
+            customInstructions: "",
+            encounterID: currentEncounter?.id ?? "",
+            phase: .initial
+        )
+        
+        await MainActor.run {
+            self.generatedNote = summarizerService.generatedNote
+            self.processingStatus = "Note generated"
+            self.isProcessing = false
+        }
+        
+        // Check for red flags
+        checkForRedFlags()
+    }
+    
+    func regenerateNote(type: NoteType) async {
+        defaultNoteType = type
+        await generateMedicalNote()
+    }
+    
+    // MARK: - Patient Management
+    func createPatient(name: String, mrn: String) {
+        currentPatient = Patient(
+            id: UUID().uuidString,
+            name: name,
+            mrn: mrn,
+            dateOfBirth: Date(),
+            encounters: []
+        )
+        
+        if let patient = currentPatient {
+            patientService.savePatient(patient)
+        }
+    }
+    
+    func loadPatient(id: String) {
+        currentPatient = patientService.getPatient(id: id)
+    }
+    
+    // MARK: - Encounter Management
+    func startNewEncounter() {
+        guard let patient = currentPatient else { return }
+        
+        currentEncounter = Encounter(
+            id: UUID().uuidString,
+            patientId: patient.id,
+            date: Date(),
+            chiefComplaint: "",
+            transcript: "",
+            generatedNote: "",
+            noteType: defaultNoteType,
+            status: .inProgress
+        )
+        
+        // Reset transcript
+        currentTranscript = ""
+        generatedNote = ""
+    }
+    
+    func saveCurrentEncounter() {
+        guard var encounter = currentEncounter else { return }
+        
+        encounter.transcript = currentTranscript
+        encounter.generatedNote = generatedNote
+        encounter.status = .completed
+        
+        encounterManager.saveEncounter(encounter)
+        
+        // Add to patient's encounters
+        currentPatient?.encounters.append(encounter)
+        if let patient = currentPatient {
+            patientService.savePatient(patient)
+        }
+    }
+    
+    // MARK: - Red Flag Detection
+    private func checkForRedFlags() {
+        let flags = redFlagService.analyzeTranscript(currentTranscript)
+        redFlags = flags
+        
+        if !flags.isEmpty {
+            processingStatus = "⚠️ Red flags detected"
+        }
+    }
+    
+    // MARK: - Audio Monitoring
+    private func startAudioLevelMonitoring() {
+        Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            if self.isRecording {
+                self.audioLevel = AudioCaptureService.shared.currentAudioLevel
+            }
+        }
+    }
+    
+    // MARK: - Observers
+    private func setupObservers() {
+        // Observe session manager changes
+        sessionManager.$generatedNote
+            .compactMap { $0 }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] note in
+                self?.generatedNote = note
+            }
+            .store(in: &cancellables)
+        
+        // Observe transcription updates
+        sessionManager.$transcriptionBuffer
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] text in
+                if !text.isEmpty {
+                    self?.currentTranscript = text
+                }
+            }
+            .store(in: &cancellables)
+    }
+    
+    // MARK: - Service Configuration
+    private func configureServices() {
+        // Configure Whisper model
+        whisperService.loadModel(selectedWhisperModel)
+        
+        // Configure summarizer
+        summarizerService.isGenerating = false
+    }
+    
+    // MARK: - State Persistence
+    private func loadSavedState() {
+        // Load last session if exists
+        if let lastSession = sessionManager.sessionHistory.last {
+            currentTranscript = lastSession.transcript
+            generatedNote = lastSession.generatedNote ?? ""
+        }
+    }
+    
+    func saveState() {
+        UserDefaults.standard.set(selectedWhisperModel, forKey: "selectedWhisperModel")
+        UserDefaults.standard.set(defaultNoteType.rawValue, forKey: "defaultNoteType")
+    }
+    
+    // MARK: - Cleanup
+    func cleanup() {
+        stopRecording()
+        saveState()
+        saveCurrentEncounter()
+    }
+    
+    private var cancellables = Set<AnyCancellable>()
+}
+
+// MARK: - Encounter Model
+struct Encounter: Codable, Identifiable {
+    let id: String
+    let patientId: String
+    let date: Date
+    var chiefComplaint: String
+    var transcript: String
+    var generatedNote: String
+    var noteType: NoteType
+    var status: EncounterStatus
+    
+    enum EncounterStatus: String, Codable {
+        case inProgress
+        case completed
+        case cancelled
+    }
+}
