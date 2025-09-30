@@ -1,0 +1,137 @@
+Doctor: Good morning, I'm Dr. Martinez. What brings you to the emergency department today?
+
+Patient: Hi doctor. I've been having really bad abdominal pain since yesterday evening. It's gotten worse and I'm also throwing up.
+
+Doctor: Okay, let's talk about this pain. Can you point to where it hurts the most?
+
+Patient: It started around my belly button, but now it's moved down here to the right lower side. That's where it really hurts now.
+
+Doctor: When exactly did this start? You said yesterday evening?
+
+Patient: Yeah, it was around 6 PM yesterday. I was eating dinner and suddenly felt this cramping pain around my belly button. At first I thought it was just something I ate.
+
+Doctor: And you said it's moved to the right lower area. When did you notice that change?
+
+Patient: Probably around midnight last night. I woke up because the pain had gotten worse and I realized it wasn't in the middle anymore, it was definitely on the right side down low.
+
+Doctor: On a scale of 1 to 10, with 10 being the worst pain imaginable, how would you rate this pain right now?
+
+Patient: Right now it's about an 8. It was a 6 when it started but it's definitely getting worse.
+
+Doctor: Does anything make it better or worse? Like moving, eating, pressing on it?
+
+Patient: Moving makes it worse for sure. Even walking here was really painful. And when I try to stand up straight, it hurts more. I've been kind of hunched over.
+
+Doctor: What about the vomiting? When did that start and how many times have you thrown up?
+
+Patient: The vomiting started this morning around 6 AM. I've thrown up maybe 4 or 5 times since then. At first it was just food, but the last couple times it was mostly just bile, that yellow-green stuff.
+
+Doctor: Have you been able to keep anything down? Any water or food?
+
+Patient: No, everything I try to drink comes back up within like 20 minutes. I'm really thirsty.
+
+Doctor: Have you had any diarrhea or constipation?
+
+Patient: No diarrhea. Actually I haven't had a bowel movement since yesterday morning, which is unusual for me. I normally go every day.
+
+Doctor: Any fever? Have you felt hot or had chills?
+
+Patient: I felt hot this morning and took my temperature at home. It was 100.8. And yeah, I've had some chills on and off.
+
+Doctor: Have you noticed any urinary symptoms? Pain with urination, frequency, or blood in your urine?
+
+Patient: No, nothing like that. Urination seems normal, though I haven't gone much today because I'm so dehydrated.
+
+Doctor: For women - when was your last menstrual period?
+
+Patient: It just ended about a week ago. It was normal, nothing unusual.
+
+Doctor: Any chance you could be pregnant?
+
+Patient: No, I don't think so. My period was normal and I'm on birth control.
+
+Doctor: Tell me about your medical history. Any prior surgeries or medical conditions?
+
+Patient: I had my appendix out when I was 12, so that can't be it. I have asthma but it's well controlled. That's really it.
+
+Doctor: Wait, you said you had your appendix out already?
+
+Patient: Oh yes, sorry. I had appendicitis when I was a kid and had surgery for it.
+
+Doctor: Okay, that's important to know. What medications do you take regularly?
+
+Patient: Just my albuterol inhaler as needed for asthma, maybe once or twice a week. And birth control pills, the generic for Yaz.
+
+Doctor: Any allergies to medications?
+
+Patient: Yes, I'm allergic to penicillin. I break out in hives.
+
+Doctor: Any family history of medical problems? Especially bowel problems, inflammatory conditions?
+
+Patient: My mom has Crohn's disease. She was diagnosed about 10 years ago. My dad has diabetes but that's it.
+
+Doctor: Do you smoke, drink alcohol, or use any recreational drugs?
+
+Patient: I don't smoke. I drink socially, maybe a glass of wine on weekends. No drugs.
+
+Doctor: Have you traveled anywhere recently or eaten anything unusual?
+
+Patient: No travel. I ate pasta for dinner yesterday, but my husband ate the same thing and he's fine.
+
+Doctor: Okay, let me examine you. I'm going to check your vital signs first. Your blood pressure is 118 over 76, that's good. Heart rate is 102, a little fast which could be from pain and dehydration. Temperature is 101.2, so you do have a fever. Oxygen saturation is 99%, that's perfect.
+
+Patient: Is the fever bad?
+
+Doctor: It's concerning with abdominal pain. Let me examine your abdomen now. I'm going to press in different areas. Tell me where it hurts.
+
+Patient: Ow! Right there, that really hurts!
+
+Doctor: That's your right lower quadrant. I'm going to press down and then quickly release. Tell me when it hurts more.
+
+Patient: Oh god, when you let go it hurts way more! That's terrible!
+
+Doctor: I know, I'm sorry. That's called rebound tenderness and it's very significant. Your abdomen also feels quite firm in that area. Do you feel nauseous when I press there?
+
+Patient: Yes, I feel like I might throw up again.
+
+Doctor: Okay, I'm done with that part. Let me listen to your belly. Your bowel sounds are present but decreased. Let me check a few more things. Can you hop on your right foot for me?
+
+Patient: I can't, that would hurt too much just thinking about it.
+
+Doctor: That's okay, that tells me what I need to know. Can you bend your right hip up toward your chest?
+
+Patient: Ahh, that hurts when I do that.
+
+Doctor: Okay, you can relax. Based on your symptoms and my exam, I'm very concerned about a few possibilities. Even though you had your appendix removed as a child, you could have something called appendiceal stump appendicitis, which is rare but can happen. Or this could be an ovarian problem like a cyst or torsion. It could also be inflammatory bowel disease given your family history of Crohn's disease.
+
+Patient: What do we need to do?
+
+Doctor: I'm going to order several tests. First, we'll get blood work including a complete blood count to check for infection, a comprehensive metabolic panel to check your electrolytes since you've been vomiting, and we'll check pregnancy even though you don't think you're pregnant - we have to be sure. I'll also order a urinalysis to rule out a kidney stone or infection.
+
+Patient: Okay, that makes sense.
+
+Doctor: Most importantly, I'm ordering a CT scan of your abdomen and pelvis with IV contrast. This will give us detailed pictures of your intestines, any remaining appendix tissue, your ovaries, and everything else in there. We need to see what's causing this.
+
+Patient: How long will all this take?
+
+Doctor: The blood work will take about an hour for results. The CT scan we should be able to do within the next 30 to 45 minutes. While we're waiting, I'm going to start an IV to give you fluids since you're dehydrated from all the vomiting. I'll also give you some anti-nausea medication and pain medication.
+
+Patient: Thank you, the pain is really bad.
+
+Doctor: I'm going to give you morphine for the pain and Zofran for the nausea through your IV. I'm also going to give you a dose of antibiotics because if this is an infection in your abdomen, we need to start treating it right away.
+
+Patient: What antibiotic? I'm allergic to penicillin remember.
+
+Doctor: Good catch. Since you're allergic to penicillin, I'll order ciprofloxacin and metronidazole instead. Those are safe for you and will cover the bacteria we're concerned about.
+
+Patient: What happens after the tests?
+
+Doctor: If the CT shows something that needs surgery, like an ovarian torsion or an abscess, I'll call in the surgical team right away. If it shows inflammatory bowel disease, we'll get gastroenterology involved. Depending on what we find, you might need to be admitted to the hospital.
+
+Patient: I really hope we figure this out. The pain is unbearable.
+
+Doctor: I understand. We're going to take good care of you. The nurse is going to start your IV now and get those medications going. You should start feeling better soon. I'll be back once we have your test results.
+
+Patient: Thank you so much doctor.
+
+Doctor: You're welcome. If your pain gets any worse or you feel faint or have any other concerning symptoms, have the nurse page me immediately.
