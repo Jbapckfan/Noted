@@ -97,6 +97,7 @@ class EncounterManager: ObservableObject {
     init() {
         availableRooms = defaultRooms
         loadRecentChiefComplaints()
+        loadEncounters()
     }
     
     // MARK: - Encounter Creation
@@ -165,6 +166,133 @@ class EncounterManager: ObservableObject {
         if let index = activeEncounters.firstIndex(where: { $0.id == encounterId }) {
             activeEncounters[index].transcription += (activeEncounters[index].transcription.isEmpty ? "" : "\n") + transcription
             activeEncounters[index].lastUpdated = Date()
+
+            // Use three-layer architecture for intelligent comprehension
+            processTranscriptionWithThreeLayerArchitecture(transcription, for: encounterId)
+
+            // Fallback: Also run legacy categorization for now during transition
+            categorizeNewInformation(transcription, for: encounterId)
+            saveEncounters()
+        }
+    }
+
+    // MARK: - Three-Layer Architecture Integration
+
+    /// Process transcription using the genius three-layer architecture
+    /// Layer 1: Perception (what was said)
+    /// Layer 2: Comprehension (what it means)
+    /// Layer 3: Generation (how to document)
+    private func processTranscriptionWithThreeLayerArchitecture(_ transcription: String, for encounterId: UUID) {
+        guard let index = activeEncounters.firstIndex(where: { $0.id == encounterId }) else { return }
+
+        // Process through the three-layer pipeline
+        let clinicalNote = ThreeLayerPipeline.process(transcription)
+
+        // Store the generated clinical note
+        activeEncounters[index].generatedClinicalNote = clinicalNote
+
+        // Update chief complaint if detected and not already set
+        if activeEncounters[index].chiefComplaint.isEmpty && !clinicalNote.chiefComplaint.isEmpty {
+            activeEncounters[index].chiefComplaint = clinicalNote.chiefComplaint
+        }
+    }
+
+    /// Generate a complete clinical note for an encounter using three-layer architecture
+    func generateClinicalNoteForEncounter(_ encounterId: UUID) -> String? {
+        guard let encounter = activeEncounters.first(where: { $0.id == encounterId }) else { return nil }
+
+        // If we don't have transcription, return nil
+        guard !encounter.transcription.isEmpty else { return nil }
+
+        // Process the full transcription through three-layer architecture
+        let clinicalNote = ThreeLayerPipeline.process(encounter.transcription)
+
+        // Return formatted SOAP note
+        return clinicalNote.generateSOAPNote()
+    }
+
+    /// Get quality metrics for an encounter's clinical note
+    func getQualityMetrics(for encounterId: UUID) -> GenerationLayer.QualityMetrics? {
+        guard let encounter = activeEncounters.first(where: { $0.id == encounterId }),
+              let generatedNote = encounter.generatedClinicalNote else {
+            return nil
+        }
+
+        return generatedNote.qualityMetrics
+    }
+
+    // MARK: - Intelligent Categorization
+
+    private func categorizeNewInformation(_ text: String, for encounterId: UUID) {
+        guard let index = activeEncounters.firstIndex(where: { $0.id == encounterId }) else { return }
+
+        let lowercased = text.lowercased()
+
+        // Initialize structured note if needed
+        if activeEncounters[index].structuredNote == nil {
+            activeEncounters[index].structuredNote = StructuredMedicalNote()
+        }
+
+        // HPI - History of Present Illness (symptoms, onset, duration, severity)
+        if lowercased.contains("pain") || lowercased.contains("ache") ||
+           lowercased.contains("started") || lowercased.contains("began") ||
+           lowercased.contains("since") || lowercased.contains("for") ||
+           lowercased.contains("hours") || lowercased.contains("days") ||
+           lowercased.contains("worse") || lowercased.contains("better") ||
+           lowercased.contains("radiates") || lowercased.contains("sharp") ||
+           lowercased.contains("dull") || lowercased.contains("burning") {
+            activeEncounters[index].structuredNote?.hpi.append(text)
+        }
+
+        // ROS - Review of Systems (general symptoms by system)
+        if lowercased.contains("fever") || lowercased.contains("chills") ||
+           lowercased.contains("sweats") || lowercased.contains("weight") ||
+           lowercased.contains("fatigue") || lowercased.contains("weakness") ||
+           lowercased.contains("shortness of breath") || lowercased.contains("sob") ||
+           lowercased.contains("cough") || lowercased.contains("nausea") ||
+           lowercased.contains("vomiting") || lowercased.contains("diarrhea") ||
+           lowercased.contains("constipation") || lowercased.contains("headache") ||
+           lowercased.contains("dizziness") || lowercased.contains("vision") {
+            activeEncounters[index].structuredNote?.ros.append(text)
+        }
+
+        // MDM - Medical Decision Making (assessment, differential, plan)
+        if lowercased.contains("differential") || lowercased.contains("diagnosis") ||
+           lowercased.contains("think") || lowercased.contains("consider") ||
+           lowercased.contains("rule out") || lowercased.contains("unlikely") ||
+           lowercased.contains("possible") || lowercased.contains("risk") ||
+           lowercased.contains("plan") || lowercased.contains("order") ||
+           lowercased.contains("test") || lowercased.contains("consult") ||
+           lowercased.contains("ekg") || lowercased.contains("labs") ||
+           lowercased.contains("imaging") || lowercased.contains("ct") ||
+           lowercased.contains("xray") || lowercased.contains("ultrasound") {
+            activeEncounters[index].structuredNote?.mdm.append(text)
+        }
+
+        // Discharge Instructions (follow-up, return precautions, medications)
+        if lowercased.contains("follow up") || lowercased.contains("return") ||
+           lowercased.contains("if worse") || lowercased.contains("precautions") ||
+           lowercased.contains("discharge") || lowercased.contains("go home") ||
+           lowercased.contains("instructions") || lowercased.contains("prescription") ||
+           lowercased.contains("take") || lowercased.contains("medication") ||
+           lowercased.contains("see your doctor") || lowercased.contains("come back") ||
+           lowercased.contains("warning signs") {
+            activeEncounters[index].structuredNote?.dischargeInstructions.append(text)
+        }
+
+        // PMH - Past Medical History
+        if lowercased.contains("history of") || lowercased.contains("diagnosed with") ||
+           lowercased.contains("hypertension") || lowercased.contains("diabetes") ||
+           lowercased.contains("asthma") || lowercased.contains("copd") {
+            activeEncounters[index].structuredNote?.pmh.append(text)
+        }
+
+        // Medications
+        if lowercased.contains("taking") || lowercased.contains("medication") ||
+           lowercased.contains("prescribed") || lowercased.contains("mg") ||
+           lowercased.contains("lisinopril") || lowercased.contains("metformin") ||
+           lowercased.contains("aspirin") || lowercased.contains("atorvastatin") {
+            activeEncounters[index].structuredNote?.medications.append(text)
         }
     }
     
@@ -314,15 +442,92 @@ class EncounterManager: ObservableObject {
     }
     
     // MARK: - Persistence
-    
+
     private func saveRecentChiefComplaints() {
         UserDefaults.standard.set(recentChiefComplaints, forKey: "recent_chief_complaints")
     }
-    
+
     private func loadRecentChiefComplaints() {
         if let saved = UserDefaults.standard.array(forKey: "recent_chief_complaints") as? [String] {
             recentChiefComplaints = saved
         }
+    }
+
+    func saveEncounters() {
+        do {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            let data = try encoder.encode(activeEncounters)
+            UserDefaults.standard.set(data, forKey: "saved_encounters")
+            UserDefaults.standard.set(Date(), forKey: "last_save_time")
+        } catch {
+            print("Failed to save encounters: \(error)")
+        }
+    }
+
+    func loadEncounters() {
+        guard let data = UserDefaults.standard.data(forKey: "saved_encounters") else { return }
+
+        do {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let loaded = try decoder.decode([MedicalEncounter].self, from: data)
+            activeEncounters = loaded
+
+            // Restore room occupancy
+            for encounter in loaded where encounter.isActive {
+                if let roomIndex = availableRooms.firstIndex(where: { $0.id == encounter.room.id }) {
+                    availableRooms[roomIndex].isOccupied = true
+                    availableRooms[roomIndex].currentEncounter = encounter.id
+                }
+            }
+        } catch {
+            print("Failed to load encounters: \(error)")
+        }
+    }
+
+    // MARK: - Pause/Resume Functionality
+
+    func pauseEncounter(_ encounterId: UUID) {
+        if let index = activeEncounters.firstIndex(where: { $0.id == encounterId }) {
+            activeEncounters[index].isPaused = true
+            activeEncounters[index].pauseTime = Date()
+            activeEncounters[index].status = .waiting
+            saveEncounters()
+        }
+    }
+
+    func resumeEncounter(_ encounterId: UUID) {
+        if let index = activeEncounters.firstIndex(where: { $0.id == encounterId }) {
+            if let pauseTime = activeEncounters[index].pauseTime {
+                let pauseDuration = Date().timeIntervalSince(pauseTime)
+                activeEncounters[index].totalPausedDuration += pauseDuration
+            }
+            activeEncounters[index].isPaused = false
+            activeEncounters[index].pauseTime = nil
+            activeEncounters[index].status = .inProgress
+            activeEncounters[index].lastUpdated = Date()
+            currentEncounter = activeEncounters[index]
+            saveEncounters()
+        }
+    }
+
+    func deleteEncounter(_ encounterId: UUID) {
+        // Remove from active encounters
+        activeEncounters.removeAll { $0.id == encounterId }
+
+        // Free up the room
+        if let roomIndex = availableRooms.firstIndex(where: { $0.currentEncounter == encounterId }) {
+            availableRooms[roomIndex].isOccupied = false
+            availableRooms[roomIndex].currentEncounter = nil
+        }
+
+        // Clear current encounter if this was it
+        if currentEncounter?.id == encounterId {
+            currentEncounter = nil
+        }
+
+        saveEncounters()
     }
     
     // MARK: - Export Functions
@@ -380,14 +585,22 @@ struct MedicalEncounter: Identifiable, Codable {
     var notes: String = ""
     var structuredNote: StructuredMedicalNote?
     var actionItems: [MedicalAction] = []
-    
+
+    // Three-Layer Architecture: Generated clinical note with quality metrics
+    var generatedClinicalNote: GenerationLayer.ClinicalNote?
+
+    // Pause/Resume tracking
+    var isPaused: Bool = false
+    var pauseTime: Date?
+    var totalPausedDuration: TimeInterval = 0
+
     var duration: TimeInterval? {
         if let endTime = endTime {
-            return endTime.timeIntervalSince(startTime)
+            return endTime.timeIntervalSince(startTime) - totalPausedDuration
         }
         return nil
     }
-    
+
     var isActive: Bool {
         return status == .inProgress || status == .waiting
     }

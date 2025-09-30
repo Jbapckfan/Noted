@@ -15,6 +15,9 @@ class RealConversationAnalyzer {
         let disposition = extractDisposition(from: text)
         let isDischarge = disposition.contains("discharge") || disposition.contains("home")
         
+        // Run clinical safety detection
+        let redFlags = ClinicalSafetyDetector.detectRedFlags(in: transcription)
+
         return RealClinicalData(
             chiefComplaint: extractRealChiefComplaint(from: text),
             hpi: extractRealHPI(from: transcription),
@@ -30,7 +33,8 @@ class RealConversationAnalyzer {
             mdm: generateMDM(from: text),
             diagnosis: extractDiagnosis(from: text),
             disposition: disposition,
-            dischargeInstructions: isDischarge ? generateDischargeInstructions(from: text) : nil
+            dischargeInstructions: isDischarge ? generateDischargeInstructions(from: text) : nil,
+            redFlags: redFlags
         )
     }
     
@@ -238,10 +242,16 @@ class RealConversationAnalyzer {
             }
         }
         
-        // Severity
-        if let severityMatch = text.range(of: "\\d+\\s*(/10|out of 10)", options: .regularExpression) {
+        // Severity - numeric and descriptive
+        if let severityMatch = text.range(of: "\\d+\\s*(out of|/)\\s*10", options: .regularExpression) {
             let severity = String(text[severityMatch])
             symptomDescription += ". The patient rates the pain as \(severity)"
+        } else if text.contains("severe pain") || text.contains("really bad") || text.contains("worst") {
+            symptomDescription += ". The patient describes severe pain"
+        } else if text.contains("moderate pain") || text.contains("pretty bad") {
+            symptomDescription += ". The patient describes moderate pain"
+        } else if text.contains("mild pain") || text.contains("little pain") {
+            symptomDescription += ". The patient describes mild pain"
         }
         
         if !symptomDescription.isEmpty {
@@ -329,30 +339,118 @@ class RealConversationAnalyzer {
             hpiComponents.append(negativeText)
         }
         
-        // Treatment mentioned in conversation
-        if text.contains("migraine cocktail") || text.contains("morphine") || text.contains("toradol") {
-            var treatments: [String] = []
-            if text.contains("migraine cocktail") {
-                treatments.append("the migraine cocktail")
+        // Treatment mentioned in conversation - comprehensive
+        var treatments: [String] = []
+
+        // Pain medications
+        if text.contains("morphine") {
+            if let doseMatch = text.range(of: "morphine.*?(\\d+\\s*mg)", options: .regularExpression) {
+                treatments.append("morphine \(String(text[doseMatch]).components(separatedBy: " ").last ?? "")")
+            } else {
+                treatments.append("morphine")
             }
-            if text.contains("morphine") {
-                if let doseMatch = text.range(of: "\\d+\\s*mg", options: .regularExpression) {
-                    treatments.append("morphine \(String(text[doseMatch]))")
-                } else {
-                    treatments.append("morphine")
+        }
+        if text.contains("toradol") || text.contains("ketorolac") {
+            treatments.append("Toradol")
+        }
+        if text.contains("fentanyl") {
+            treatments.append("fentanyl")
+        }
+        if text.contains("dilaudid") || text.contains("hydromorphone") {
+            treatments.append("Dilaudid")
+        }
+
+        // Antiemetics
+        if text.contains("zofran") || text.contains("ondansetron") {
+            treatments.append("Zofran")
+        }
+        if text.contains("phenergan") || text.contains("promethazine") {
+            treatments.append("Phenergan")
+        }
+        if text.contains("reglan") || text.contains("metoclopramide") {
+            treatments.append("Reglan")
+        }
+
+        // Cardiac medications
+        if text.contains("aspirin") && (text.contains("chew") || text.contains("give") || text.contains("gave")) {
+            treatments.append("aspirin")
+        }
+        if text.contains("nitroglycerin") || text.contains("nitro") && text.contains("tongue") {
+            treatments.append("sublingual nitroglycerin")
+        }
+
+        // IV fluids
+        if text.contains("iv fluids") || text.contains("iv fluid") || text.contains("bolus") {
+            if text.contains("liter") {
+                if let literMatch = text.range(of: "\\d+\\s*liter", options: .regularExpression) {
+                    treatments.append("\(String(text[literMatch])) IV fluid")
                 }
+            } else {
+                treatments.append("IV fluids")
             }
-            if text.contains("toradol") {
-                treatments.append("Toradol")
+        }
+
+        // Antibiotics
+        if text.contains("cipro") || text.contains("ciprofloxacin") {
+            treatments.append("ciprofloxacin")
+        }
+        if text.contains("flagyl") || text.contains("metronidazole") {
+            treatments.append("metronidazole")
+        }
+        if text.contains("levofloxacin") || text.contains("levaquin") {
+            treatments.append("levofloxacin")
+        }
+        if text.contains("ceftriaxone") || text.contains("rocephin") {
+            treatments.append("ceftriaxone")
+        }
+        if text.contains("vancomycin") || text.contains("vanco") {
+            treatments.append("vancomycin")
+        }
+
+        // Diuretics
+        if text.contains("lasix") || text.contains("furosemide") {
+            if text.contains("iv") {
+                treatments.append("IV Lasix")
+            } else {
+                treatments.append("Lasix")
             }
-            if text.contains("zofran") {
-                treatments.append("Zofran")
+        }
+
+        // Breathing treatments
+        if text.contains("breathing treatment") || text.contains("nebulizer") || text.contains("albuterol") && text.contains("neb") {
+            treatments.append("albuterol nebulizer")
+        }
+        if text.contains("duoneb") {
+            treatments.append("DuoNeb")
+        }
+
+        // Steroids
+        if text.contains("solu-medrol") || text.contains("methylprednisolone") {
+            treatments.append("Solu-Medrol")
+        }
+        if text.contains("dexamethasone") || text.contains("decadron") {
+            treatments.append("dexamethasone")
+        }
+
+        // Migraine cocktail
+        if text.contains("migraine cocktail") {
+            treatments.append("migraine cocktail")
+        }
+
+        // Oxygen
+        if text.contains("oxygen") && !text.contains("level") {
+            if text.contains("liters") {
+                if let literMatch = text.range(of: "\\d+\\s*liter", options: .regularExpression) {
+                    treatments.append("oxygen at \(String(text[literMatch]))")
+                }
+            } else {
+                treatments.append("supplemental oxygen")
             }
-            
-            if !treatments.isEmpty {
-                let treatmentText = "In the Emergency Department, the patient was given " + treatments.joined(separator: " and ")
-                hpiComponents.append(treatmentText)
-            }
+        }
+
+        if !treatments.isEmpty {
+            let treatmentText = "In the Emergency Department, the patient was treated with " + treatments.joined(separator: ", ")
+            hpiComponents.append(treatmentText)
         }
         
         // Join all components into a narrative paragraph
@@ -658,8 +756,183 @@ class RealConversationAnalyzer {
     
     // MARK: - Extract Physical Exam
     static func extractPhysicalExam(from text: String) -> String {
-        // Since physical exam is usually not detailed in conversation, provide template
-        return "Vital signs and complete physical examination pending documentation"
+        var exam: [String] = []
+
+        // Extract vital signs WITH VALIDATION
+        var vitals: [String] = []
+
+        // Blood Pressure
+        if let bpMatch = text.range(of: #"(\d{2,3})\s*over\s*(\d{2,3})"#, options: .regularExpression) {
+            let bpText = String(text[bpMatch])
+
+            // Extract systolic and diastolic values
+            let components = bpText.components(separatedBy: " over ")
+            if components.count == 2,
+               let systolic = Int(components[0]),
+               let diastolic = Int(components[1]) {
+
+                // Validate BP ranges (systolic: 70-250, diastolic: 40-150)
+                if systolic < 70 || systolic > 250 || diastolic < 40 || diastolic > 150 {
+                    vitals.append("BP \(bpText) [⚠️ VERIFY - outside normal range]")
+                } else {
+                    vitals.append("BP \(bpText)")
+                }
+            } else {
+                vitals.append("BP \(bpText)")
+            }
+        }
+
+        // Heart Rate
+        if let hrMatch = text.range(of: #"heart rate.*?(\d{2,3})"#, options: .regularExpression) {
+            let hrSection = String(text[hrMatch])
+            if let numMatch = hrSection.range(of: #"\d{2,3}"#, options: .regularExpression) {
+                let hrString = String(hrSection[numMatch])
+                if let hr = Int(hrString) {
+                    // Validate HR range (adult: 40-180 bpm)
+                    if hr < 40 || hr > 180 {
+                        vitals.append("HR \(hr) [⚠️ VERIFY - outside normal range]")
+                    } else {
+                        vitals.append("HR \(hr)")
+                    }
+                } else {
+                    vitals.append("HR \(hrString)")
+                }
+            }
+        }
+
+        // Temperature
+        if let tempMatch = text.range(of: #"temperature.*?(\d{2,3}(\.\d+)?)"#, options: .regularExpression) {
+            let tempSection = String(text[tempMatch])
+            if let numMatch = tempSection.range(of: #"\d{2,3}(\.\d+)?"#, options: .regularExpression) {
+                let tempString = String(tempSection[numMatch])
+                if let temp = Double(tempString) {
+                    // Validate temperature range (95-106°F)
+                    if temp < 95.0 || temp > 106.0 {
+                        vitals.append("Temp \(temp)°F [⚠️ VERIFY - outside normal range]")
+                    } else {
+                        vitals.append("Temp \(temp)°F")
+                    }
+                } else {
+                    vitals.append("Temp \(tempString)°F")
+                }
+            }
+        }
+
+        // Oxygen Saturation
+        if let o2Match = text.range(of: #"(\d{2,3})%"#, options: .regularExpression) {
+            let o2String = String(text[o2Match]).replacingOccurrences(of: "%", with: "")
+            if let o2 = Int(o2String) {
+                // Validate O2 sat range (70-100%)
+                if o2 < 70 || o2 > 100 {
+                    vitals.append("O2 sat \(o2)% [⚠️ VERIFY - outside plausible range]")
+                } else {
+                    vitals.append("O2 sat \(o2)%")
+                }
+
+                // Check for supplemental oxygen
+                if text.contains("room air") {
+                    vitals[vitals.count - 1] = vitals[vitals.count - 1].replacingOccurrences(of: "%", with: "% on RA")
+                } else if text.contains("liters") || text.contains("l/min") {
+                    if let literMatch = text.range(of: #"(\d+)\s*(l|liter)"#, options: .regularExpression) {
+                        let liters = String(text[literMatch])
+                        vitals[vitals.count - 1] = vitals[vitals.count - 1].replacingOccurrences(of: "%", with: "% on \(liters) O2")
+                    }
+                }
+            } else {
+                vitals.append("O2 sat \(o2String)%")
+            }
+        }
+
+        if !vitals.isEmpty {
+            exam.append("Vitals: \(vitals.joined(separator: ", "))")
+        }
+
+        // General appearance
+        if text.contains("alert") && text.contains("oriented") {
+            exam.append("General: Alert and oriented, no acute distress")
+        }
+
+        // Cardiovascular
+        var cardiac: [String] = []
+        if text.contains("heart sounds regular") || text.contains("regular rate and rhythm") {
+            cardiac.append("Regular rate and rhythm")
+        }
+        if text.contains("murmur") {
+            cardiac.append("Murmur noted")
+        }
+        if !cardiac.isEmpty {
+            exam.append("Cardiovascular: \(cardiac.joined(separator: ", "))")
+        }
+
+        // Pulmonary
+        var pulm: [String] = []
+        if text.contains("lungs are clear") || text.contains("clear bilaterally") {
+            pulm.append("Clear to auscultation bilaterally")
+        }
+        if text.contains("crackles") || text.contains("rales") {
+            if text.contains("bases") {
+                pulm.append("Crackles at bases")
+            } else {
+                pulm.append("Crackles noted")
+            }
+        }
+        if text.contains("wheezing") || text.contains("wheeze") {
+            pulm.append("Wheezing present")
+        }
+        if !pulm.isEmpty {
+            exam.append("Pulmonary: \(pulm.joined(separator: ", "))")
+        }
+
+        // Abdomen
+        var abd: [String] = []
+        if text.contains("soft") && (text.contains("abdomen") || text.contains("belly")) {
+            abd.append("Soft")
+        }
+        if text.contains("tender") || text.contains("tenderness") {
+            if text.contains("right lower") || text.contains("rlq") {
+                abd.append("Tender in RLQ")
+            } else if text.contains("right upper") || text.contains("ruq") {
+                abd.append("Tender in RUQ")
+            } else {
+                abd.append("Tenderness present")
+            }
+        }
+        if text.contains("rebound") {
+            abd.append("Rebound tenderness")
+        }
+        if text.contains("guarding") {
+            abd.append("Guarding")
+        }
+        if text.contains("distended") {
+            abd.append("Distended")
+        }
+        if !abd.isEmpty {
+            exam.append("Abdomen: \(abd.joined(separator: ", "))")
+        }
+
+        // Extremities
+        var ext: [String] = []
+        if text.contains("swelling") && (text.contains("ankle") || text.contains("leg")) {
+            ext.append("Edema noted in lower extremities")
+        }
+        if text.contains("no edema") || text.contains("no swelling") && text.contains("leg") {
+            ext.append("No edema")
+        }
+        if !ext.isEmpty {
+            exam.append("Extremities: \(ext.joined(separator: ", "))")
+        }
+
+        // Neuro
+        if text.contains("strength") || text.contains("sensation") || text.contains("reflexes") {
+            exam.append("Neurologic: Grossly intact")
+        }
+
+        // Return formatted exam
+        if exam.isEmpty {
+            return "Physical examination documented in chart"
+        }
+
+        return exam.joined(separator: "\n")
     }
     
     // MARK: - Extract Diagnosis
@@ -777,49 +1050,63 @@ struct RealClinicalData {
     let diagnosis: String
     let disposition: String
     let dischargeInstructions: String?
+    let redFlags: [ClinicalSafetyDetector.RedFlag]
     
     func generateSOAPNote() -> String {
-        var note = """
+        var note = ""
+
+        // Add red flag alerts at the TOP if present
+        if !redFlags.isEmpty {
+            note += """
+            ⚠️ **CRITICAL ALERTS DETECTED** ⚠️
+            \(ClinicalSafetyDetector.generateRedFlagReport(redFlags))
+            ═══════════════════════════════════════════════════
+
+
+            """
+        }
+
+        note += """
         **CHIEF COMPLAINT:** \(chiefComplaint)
-        
+
         **HISTORY OF PRESENT ILLNESS:**
         \(hpi)
-        
+
         **PAST MEDICAL HISTORY:** \(pmh)
         **PAST SURGICAL HISTORY:** \(psh)
         **MEDICATIONS:** \(medications)
         **ALLERGIES:** \(allergies)
         **SOCIAL HISTORY:** \(socialHistory)
         **FAMILY HISTORY:** \(familyHistory)
-        
+
         **REVIEW OF SYSTEMS:** \(ros)
-        
+
         **PHYSICAL EXAM:**
         \(physicalExam)
-        
+
         **ASSESSMENT:**
         \(assessment)
-        
+
         **MEDICAL DECISION MAKING:**
         \(mdm)
-        
+
         **DIAGNOSIS:**
         \(diagnosis)
-        
+
         **DISPOSITION:**
         \(disposition)
         """
-        
+
         // Add discharge instructions if patient is being discharged
         if let instructions = dischargeInstructions, !instructions.isEmpty {
             note += """
-            
-            
+
+
             **DISCHARGE INSTRUCTIONS:**
             \(instructions)
             """
         }
-        
+
         return note
     }
 }

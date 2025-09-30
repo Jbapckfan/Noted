@@ -668,6 +668,14 @@ struct StructuredMedicalNote: Codable {
     var assessment: String = ""
     var plan: String = ""
     var vitalSigns: VitalSigns?
+
+    // New categorized arrays for incremental updates
+    var hpi: [String] = []
+    var ros: [String] = []
+    var mdm: [String] = []
+    var dischargeInstructions: [String] = []
+    var pmh: [String] = []
+    var medications: [String] = []
 }
 
 // Using VitalSigns from MedicalTypes.swift
