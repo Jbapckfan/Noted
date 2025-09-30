@@ -287,42 +287,12 @@ final class ProductionMedicalSummarizerService: ObservableObject {
         var finalNote = "# Patient Encounter Documentation\n"
         finalNote += "*Generated from conversation transcript - Ready for EMR entry*\n\n"
         
-        // Section 1: Critical Alerts (if any)
-        if !criticalFlags.isEmpty {
-            finalNote += generateCriticalAlertsSection(criticalFlags)
-            finalNote += "\n\n"
-        }
-        
-        // Section 2: High Priority Concerns (if any)
-        if !highFlags.isEmpty {
-            finalNote += generateHighPrioritySection(highFlags)
-            finalNote += "\n\n"
-        }
-        
-        // Section 3: Enhanced Medical Analysis
-        statusMessage = "🔍 Processing medical information..."
-        progress = 0.4
-        
-        finalNote += generateEnhancedAnalysisSection(fullContext)
-        finalNote += "\n\n"
-        
-        // Section 4: Human‑scribe style documentation (concise, non‑verbatim)
-        statusMessage = "🧑🏽‍⚕️ Creating scribe‑style documentation..."
-        progress = 0.6
+        // Human-scribe style documentation (concise, non-verbatim)
+        statusMessage = "Generating note..."
+        progress = 0.5
         let scribe = ScribeStyleNoteBuilder()
-        let scribeNote = scribe.buildNote(noteType: noteType, context: fullContext, transcription: finalTranscription)
-        finalNote += scribeNote
-        
-        // Section 5: Quality and Compliance Report
-        statusMessage = "✅ Finalizing documentation..."
-        progress = 0.8
-        
-        finalNote += "\n\n"
-        finalNote += generateQualityReport()
-        
-        // Section 6: Recommendations
-        finalNote += "\n\n"
-        finalNote += generateClinicalRecommendations(fullContext, allRedFlags)
+        finalNote = scribe.buildNote(noteType: noteType, context: fullContext, transcription: finalTranscription)
+        progress = 0.9
         
         // Finalize
         generatedNote = finalNote

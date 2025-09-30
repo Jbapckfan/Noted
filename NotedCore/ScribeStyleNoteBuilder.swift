@@ -25,60 +25,45 @@ struct ScribeStyleNoteBuilder {
     }
     
     private func buildEDNote(context: EnhancedMedicalAnalyzer.MedicalContext, transcription: String) -> String {
-        let ts = Date().formatted(date: .abbreviated, time: .shortened)
         let room = CoreAppState.shared.currentRoom
         let ccDisplay = CoreAppState.shared.currentChiefComplaint.isEmpty ? chiefComplaint(from: context, transcription: transcription) : CoreAppState.shared.currentChiefComplaint
-        
-        // Chief Complaint and HPI (OLDCARTS)
+
         let cc = ccDisplay
         let hpi = hpiOLDCARTS(context: context, transcription: transcription)
         let ros = reviewOfSystems(context: context)
         let pmh = sectionFromConditions(context: context)
         let meds = sectionFromMeds(context: context)
-        let vitals = sectionFromVitals(context: context)
         let exam = defaultPE(context: context)
         let mdm = mdmSection(context: context, transcription: transcription)
         let plan = planSection(context: context)
         let dispo = dispositionSection(context: context, transcription: transcription)
-        let precautions = returnPrecautionsSection(context: context)
-        let communication = patientCommunicationSection()
-        
+
         return """
-        ED NOTE — Generated: \(ts)\nRoom: \(room.isEmpty ? "N/A" : room)
+        Room \(room.isEmpty ? "—" : room) | \(cc)
 
-        CHIEF COMPLAINT
-        • \(cc)
-
-        HISTORY OF PRESENT ILLNESS (Concise, physician-voice)
+        HPI
         \(hpi)
 
-        PERTINENT REVIEW OF SYSTEMS
+        ROS
         \(ros)
 
-        PAST MEDICAL HISTORY / MEDICATIONS
+        PMH
         \(pmh)
+
+        MEDS
         \(meds)
 
-        VITAL SIGNS
-        \(vitals)
-
-        PHYSICAL EXAM (Focused)
+        EXAM
         \(exam)
 
-        MEDICAL DECISION MAKING
+        MDM
         \(mdm)
 
-        PLAN / ORDERS
+        PLAN
         \(plan)
 
-        DISPOSITION
+        DISPO
         \(dispo)
-
-        RETURN PRECAUTIONS
-        \(precautions)
-        
-        PATIENT COMMUNICATION & COUNSELING
-        \(communication)
         """
     }
     
@@ -229,40 +214,24 @@ struct ScribeStyleNoteBuilder {
     
     private func planSection(context: EnhancedMedicalAnalyzer.MedicalContext) -> String {
         var orders: [String] = []
-        orders.append("Place on monitor, serial vitals.")
-        orders.append("EKG and basic labs (CBC/BMP/troponin) if cardiopulmonary concerns.")
-        orders.append("Chest imaging if respiratory or chest symptoms.")
-        if context.symptoms.contains(where: { $0.name.contains("nausea") }) { orders.append("Antiemetic PRN.") }
-        if context.symptoms.contains(where: { $0.name.contains("pain") }) { orders.append("Analgesia as appropriate.") }
-        return "• " + orders.joined(separator: "\n• ")
+
+        // Only include specific orders mentioned or clearly indicated
+        if context.symptoms.contains(where: { $0.name.lowercased().contains("chest") }) {
+            orders.append("EKG")
+            orders.append("Troponin")
+        }
+        if context.symptoms.contains(where: { $0.name.contains("nausea") }) {
+            orders.append("Antiemetic")
+        }
+        if context.symptoms.contains(where: { $0.name.contains("pain") }) {
+            orders.append("Analgesia")
+        }
+
+        return orders.isEmpty ? "Per protocol." : orders.joined(separator: ", ")
     }
     
     private func dispositionSection(context: EnhancedMedicalAnalyzer.MedicalContext, transcription: String) -> String {
-        let cc = chiefComplaint(from: context, transcription: transcription).lowercased()
-        if cc.contains("chest") {
-            return "Observation for serial troponins/ECGs; admit if positive findings; discharge if low‑risk with reliable follow‑up."
-        }
-        return "Disposition based on response to treatment and diagnostic results; ensure reliable follow‑up."
-    }
-    
-    private func returnPrecautionsSection(context: EnhancedMedicalAnalyzer.MedicalContext) -> String {
-        return "Return immediately for worsening symptoms, new chest pain, dyspnea, syncope, fever, or any concern."
-    }
-    
-    private func patientCommunicationSection() -> String {
-        // Pull from live commitments captured during encounter (no EHR integration)
-        let commitments = KeyUtteranceTracker.shared.items.filter { $0.kind == .commitment }
-        let instructions = KeyUtteranceTracker.shared.items.filter { $0.kind == .instruction }
-        var lines: [String] = []
-        if !commitments.isEmpty {
-            lines.append("Discussion:")
-            commitments.prefix(5).forEach { lines.append("• \($0.title)") }
-        }
-        if !instructions.isEmpty {
-            lines.append("Counseling / instructions discussed:")
-            instructions.prefix(8).forEach { lines.append("• \($0.title)") }
-        }
-        return lines.isEmpty ? "Key elements of the plan and return precautions were discussed with the patient, who voiced understanding." : lines.joined(separator: "\n")
+        return "See orders and plan."
     }
     
     private func reviewOfSystems(context: EnhancedMedicalAnalyzer.MedicalContext) -> String {
