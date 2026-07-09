@@ -737,7 +737,7 @@ struct GenerationLayer {
 
     // MARK: - Output Structures
 
-    struct ClinicalNote {
+    struct ClinicalNote: Codable {
         var chiefComplaint: String = ""
         var hpi: String = ""
         var medications: String = ""
@@ -765,7 +765,7 @@ struct GenerationLayer {
         }
     }
 
-    struct QualityMetrics {
+    struct QualityMetrics: Codable {
         var completeness: Double = 0.0
         var confidence: Double = 0.0
         var specificity: Double = 0.0

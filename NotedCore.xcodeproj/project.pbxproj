@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FE03FE03FE03FE03FE03FE03 /* NotedCoreKit in Frameworks */ = {isa = PBXBuildFile; productRef = FE02FE02FE02FE02FE02FE02 /* NotedCoreKit */; };
 		D0FE6ADA2E1F3F1F0019CD1F /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = D0FE6AD92E1F3F1F0019CD1F /* WhisperKit */; };
 		D0FE6ADC2E1F3F1F0019CD1F /* whisperkit-cli in Frameworks */ = {isa = PBXBuildFile; productRef = D0FE6ADB2E1F3F1F0019CD1F /* whisperkit-cli */; };
 		D0FE6AE32E1F6F0B0019CD1F /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = D0FE6AE22E1F6F0B0019CD1F /* MLX */; };
@@ -107,6 +108,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FE03FE03FE03FE03FE03FE03 /* NotedCoreKit in Frameworks */,
 				D0FE6AE32E1F6F0B0019CD1F /* MLX in Frameworks */,
 				D0FE6AE92E1F6F0B0019CD1F /* MLXLinalg in Frameworks */,
 				D0FE6ADA2E1F3F1F0019CD1F /* WhisperKit in Frameworks */,
@@ -201,6 +203,7 @@
 			);
 			name = NotedCore;
 			packageProductDependencies = (
+				FE02FE02FE02FE02FE02FE02 /* NotedCoreKit */,
 				D0FE6AD92E1F3F1F0019CD1F /* WhisperKit */,
 				D0FE6ADB2E1F3F1F0019CD1F /* whisperkit-cli */,
 				D0FE6AE22E1F6F0B0019CD1F /* MLX */,
@@ -373,6 +376,7 @@
 			packageReferences = (
 				D0FE6AD82E1F3F1F0019CD1F /* XCRemoteSwiftPackageReference "WhisperKit" */,
 				D0FE6AE12E1F6F0B0019CD1F /* XCRemoteSwiftPackageReference "mlx-swift" */,
+				FE01FE01FE01FE01FE01FE01 /* XCLocalSwiftPackageReference "NotedCoreKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D037A5AE2E1ED2A10015A53E /* Products */;
@@ -640,7 +644,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -673,7 +677,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -698,7 +702,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 529ZZJHQR4;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jamesalford.NotedCoreTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -718,7 +722,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 529ZZJHQR4;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jamesalford.NotedCoreTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1009,7 +1013,18 @@
 		};
 /* End XCRemoteSwiftPackageReference section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		FE01FE01FE01FE01FE01FE01 /* XCLocalSwiftPackageReference "NotedCoreKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = NotedCoreKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
+		FE02FE02FE02FE02FE02FE02 /* NotedCoreKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotedCoreKit;
+		};
 		D0FE6AD92E1F3F1F0019CD1F /* WhisperKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = D0FE6AD82E1F3F1F0019CD1F /* XCRemoteSwiftPackageReference "WhisperKit" */;

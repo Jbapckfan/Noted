@@ -74,13 +74,13 @@ private struct EncounterRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            StatusBadge(status: status)
+            ShiftRowBadge(status: status)
         }
         .padding(.vertical, 4)
     }
 }
 
-private struct StatusBadge: View {
+private struct ShiftRowBadge: View {
     let status: EncounterStatus
     var body: some View {
         Text(status.label)

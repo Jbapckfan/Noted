@@ -148,7 +148,7 @@ public struct NotedCoreConfiguration {
         
         // API configuration
         self.api = APIConfiguration(
-            baseURL: environment.baseURL,
+            baseURL: "", // offline app — no backend base URL (removed in the offline rearchitecture)
             timeout: 30.0,
             maxRetries: 3,
             apiKey: ProcessInfo.processInfo.environment["API_KEY"],

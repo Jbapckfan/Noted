@@ -12,7 +12,7 @@
 import Foundation
 import NotedCoreKit
 
-#if canImport(MLX) && canImport(WhisperKit)
+#if canImport(MLXLLM) && canImport(WhisperKit)
 public struct OnDeviceNoteEngine: NoteEngine {
     let transcriber: WhisperTranscriber
     let mlx: MLXNoteEngine
@@ -39,11 +39,15 @@ public enum NoteEngineFactory {
     public static func make(audioDirectory: URL, modelPath: String) -> NoteEngine {
         #if targetEnvironment(simulator)
         return MockNoteEngine()
-        #else
+        #elseif canImport(MLXLLM) && canImport(WhisperKit)
         return OnDeviceNoteEngine(
             transcriber: WhisperTranscriber(audioDirectory: audioDirectory),
             mlx: MLXNoteEngine(modelPath: modelPath)
         )
+        #else
+        // mlx-swift-examples (MLXLLM/MLXLMCommon) not linked yet — run the deterministic mock until
+        // the real engine package is added (see docs/INTEGRATION.md, step 3).
+        return MockNoteEngine()
         #endif
     }
 }

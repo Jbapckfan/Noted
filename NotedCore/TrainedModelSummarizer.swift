@@ -42,7 +42,7 @@ class TrainedModelSummarizer: ObservableObject {
             let input = MedicalSummarizerInput(text: transcript)
 
             // Run inference on Neural Engine
-            let prediction = try model.prediction(input: input)
+            let prediction = try await model.prediction(input: input)
 
             // Get output (CoreML generates 'label' property for text classifiers)
             let summary = prediction.label

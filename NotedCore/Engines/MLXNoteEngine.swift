@@ -16,7 +16,10 @@
 import Foundation
 import NotedCoreKit
 
-#if canImport(MLX)
+// Requires MLXLLM/MLXLMCommon from the `mlx-swift-examples` package. When it isn't linked (e.g. a
+// simulator build that only needs the mock engine), this whole file compiles out and the factory
+// falls back to MockNoteEngine.
+#if canImport(MLXLLM)
 import MLX
 import MLXLLM
 import MLXLMCommon
