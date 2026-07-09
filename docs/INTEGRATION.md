@@ -28,6 +28,11 @@ needs it). Build. `import NotedCoreKit` now resolves in the app.
   Limit** (adds `com.apple.developer.kernel.increased-memory-limit`). The ~2 GB 4-bit model needs it.
 - **Background audio**: Signing & Capabilities → Background Modes → check **Audio**. (Lets capture
   survive backgrounding.)
+- **Bluetooth mic**: handled in code — `AVAudioEngineInput` uses `.allowBluetooth` (HFP input
+  profile), prefers a connected BT mic via the tested `AudioRoutePolicy`, and rebuilds the tap on
+  route changes so a BT device connecting/dropping mid-encounter doesn't break capture. Verify on
+  device with your actual BT mic; if you need to force the built-in mic, set
+  `AVAudioEngineInput(manualPreference: .builtIn)`.
 - **iOS 26 background generation** (optional, best-effort): Background Modes → **Background
   processing**; register the `BGContinuedProcessingTask` in step 6.
 - **Info.plist**: `NSMicrophoneUsageDescription` (mic), and `NSSpeechRecognitionUsageDescription`
