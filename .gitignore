@@ -200,3 +200,9 @@ build_*/
 *.app/
 WatchTestApp
 WatchTestApp.xcodeproj/
+
+# PR0: build logs + deleted scaffolding dirs
+build_output.txt
+build_test.log
+NotedCore_disabled_files/
+NotedCore_backups/

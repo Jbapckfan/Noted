@@ -1,0 +1,6 @@
+#!/bin/sh
+# Tracked pre-commit hook. Activate once with:
+#   git config core.hooksPath .githooks
+# Blocks commits that introduce credentials. (Offline-guard runs in CI/pre-push, not here,
+# so mid-refactor commits during the online-path excision aren't blocked.)
+exec sh "$(git rev-parse --show-toplevel)/scripts/check-secrets.sh" --staged
