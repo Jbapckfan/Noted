@@ -11,7 +11,7 @@ import Foundation
 public enum NoteTemplate {
 
     /// Emergency-department HPI + MDM note.
-    public static func renderHPIandMDM(_ facts: ClinicalFacts) -> String {
+    public static func renderHPIandMDM(_ facts: ClinicalFacts, removed: [VerificationFlag] = []) -> String {
         // Nothing extracted yet → empty note (don't emit a lone "NKDA").
         let hasContent = facts.chiefComplaint?.isEmpty == false
             || facts.hpi?.isEmpty == false
@@ -21,6 +21,7 @@ public enum NoteTemplate {
         guard hasContent else { return "" }
 
         var sections: [String] = []
+        sections.append("*** AI DRAFT — every value below was checked against your transcript. Review before signing. ***")
 
         if let cc = facts.chiefComplaint, !cc.isEmpty {
             sections.append("CHIEF COMPLAINT: \(cc)")
@@ -80,6 +81,11 @@ public enum NoteTemplate {
         }
         if !facts.returnPrecautions.isEmpty {
             sections.append("RETURN PRECAUTIONS:\n" + facts.returnPrecautions.map { "  - \($0)" }.joined(separator: "\n"))
+        }
+
+        if !removed.isEmpty {
+            let lines = removed.map { "  - \($0.claim)" }.joined(separator: "\n")
+            sections.append("REMOVED — not found in the transcript (re-add only if it was actually stated):\n\(lines)")
         }
 
         return sections.joined(separator: "\n\n")

@@ -43,6 +43,14 @@ struct EncounterDetailView: View {
                 .font(.body.monospaced())
             }
 
+            if let transcript = encounter.transcript, !transcript.isEmpty {
+                Section("Transcript — exactly what was heard") {
+                    Text(transcript)
+                        .font(.callout)
+                        .textSelection(.enabled)
+                }
+            }
+
             if encounter.dischargeClinicianText != nil || encounter.dischargePatientText != nil || encounter.phase == .dischargeDrafted {
                 Section("Discharge — clinician") {
                     TextEditor(text: Binding(

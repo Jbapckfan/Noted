@@ -105,6 +105,60 @@ public struct GroundingVerifier {
         return VerificationReport(flags: flags)
     }
 
+    /// GATE the note: return a copy of `facts` with every ungrounded medication, dose, lab value,
+    /// and vital REMOVED (not merely flagged), plus a report of what was dropped. Nothing that
+    /// isn't in the transcript can reach the rendered note — a hallucinated troponin is deleted,
+    /// not annotated. Only same-value verified facts survive.
+    public func filtered(_ facts: ClinicalFacts) -> (facts: ClinicalFacts, report: VerificationReport) {
+        var flags: [VerificationFlag] = []
+        var kept = facts
+
+        kept.medications = facts.medications.filter { med in
+            guard phraseGrounded(med.drug) else {
+                flags.append(.init(kind: .ungroundedMedication, claim: med.drug, detail: "removed — drug not said in the encounter"))
+                return false
+            }
+            if let dose = med.dose, !dose.isEmpty {
+                let tokens = Self.numericTokens(in: dose)
+                if !tokens.isEmpty, !valueGroundedNear(name: med.drug, numericTokens: tokens) {
+                    flags.append(.init(kind: .ungroundedDose, claim: "\(med.drug) \(dose)", detail: "removed — dose not said near the drug"))
+                    return false
+                }
+            }
+            return true
+        }
+
+        kept.labs = facts.labs.filter { lab in
+            let tokens = Self.numericTokens(in: lab.value)
+            guard !tokens.isEmpty else { return false } // no numeric result → not a real lab value
+            if !valueGroundedNear(name: lab.test, numericTokens: tokens) {
+                flags.append(.init(kind: .ungroundedLabValue, claim: "\(lab.test) \(lab.value)", detail: "removed — result not said in the encounter"))
+                return false
+            }
+            return true
+        }
+
+        kept.vitals = facts.vitals.filter { vital in
+            let tokens = Self.numericTokens(in: vital.value)
+            guard !tokens.isEmpty else { return true } // non-numeric vital label; keep
+            if !valueGroundedNear(name: vital.name, numericTokens: tokens) {
+                flags.append(.init(kind: .ungroundedVitalValue, claim: "\(vital.name) \(vital.value)", detail: "removed — value not said in the encounter"))
+                return false
+            }
+            return true
+        }
+
+        if let allowed = allowedPrecautions {
+            kept.returnPrecautions = facts.returnPrecautions.filter { p in
+                if allowed.contains(Self.normalize(p)) { return true }
+                flags.append(.init(kind: .fabricatedPrecaution, claim: p, detail: "removed — not in the approved library"))
+                return false
+            }
+        }
+
+        return (kept, VerificationReport(flags: flags))
+    }
+
     // MARK: - Matching primitives
 
     /// A phrase (drug/test name) appears in the transcript, whitespace/case-insensitive.

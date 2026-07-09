@@ -154,9 +154,12 @@ public actor GenerationWorker {
         guard let extraction = e.extractionJSON, !extraction.isEmpty else {
             throw StageError.missingInput("extractionJSON")
         }
-        let facts = try ClinicalFacts.parse(extraction)
-        e.noteText = NoteTemplate.renderHPIandMDM(facts)
-        let report = GroundingVerifier(transcript: e.transcript ?? "").verify(facts)
+        let parsed = try ClinicalFacts.parse(extraction)
+        // GATE: strip every med/dose/lab/vital that isn't grounded in the transcript, so the note
+        // can never contain a value the encounter didn't produce (a hallucinated troponin is removed,
+        // not merely flagged). Dropped values are listed in the note + the report.
+        let (grounded, report) = GroundingVerifier(transcript: e.transcript ?? "").filtered(parsed)
+        e.noteText = NoteTemplate.renderHPIandMDM(grounded, removed: report.flags)
         e.verificationReport = Self.encode(report)
     }
 
