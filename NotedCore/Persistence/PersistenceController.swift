@@ -206,21 +206,32 @@ class PersistenceController: ObservableObject {
     // MARK: - Error Handling
     
     private func handlePersistenceError(_ error: Error) {
-        // In production, this would send telemetry and attempt recovery
         print("Persistence error: \(error)")
-        
-        // Attempt to recover by removing corrupted store
-        if let storeURL = container.persistentStoreDescriptions.first?.url {
-            do {
-                try FileManager.default.removeItem(at: storeURL)
-                // Reload stores
-                container.loadPersistentStores { _, error in
-                    if let error = error {
-                        print("Failed to recover from persistence error: \(error)")
-                    }
-                }
-            } catch {
-                print("Failed to remove corrupted store: \(error)")
+
+        // NON-DESTRUCTIVE recovery. The old code did `removeItem(storeURL)` here, which
+        // WIPED the entire store on ANY load failure — one migration slip could erase a
+        // whole shift. Instead, move the corrupt store (and its SQLite sidecars) ASIDE to
+        // `<name>.corrupt-<epoch>`, preserving the bytes, then start a fresh store.
+        // (NotedCoreKit's SwiftData store follows the same rule.)
+        guard let storeURL = container.persistentStoreDescriptions.first?.url else { return }
+        let fm = FileManager.default
+        let stamp = Int(Date().timeIntervalSince1970)
+        let dir = storeURL.deletingLastPathComponent()
+        let ext = storeURL.pathExtension
+        let base = storeURL.deletingPathExtension().lastPathComponent
+        let destName = ext.isEmpty ? "\(base).corrupt-\(stamp)" : "\(base).corrupt-\(stamp).\(ext)"
+        let dest = dir.appendingPathComponent(destName)
+
+        for suffix in ["", "-wal", "-shm", "-journal"] {
+            let src = URL(fileURLWithPath: storeURL.path + suffix)
+            guard fm.fileExists(atPath: src.path) else { continue }
+            try? fm.moveItem(at: src, to: URL(fileURLWithPath: dest.path + suffix))
+        }
+        print("Moved corrupt store aside to \(dest.lastPathComponent); starting fresh (no data deleted).")
+
+        container.loadPersistentStores { _, error in
+            if let error = error {
+                print("Failed to recover from persistence error: \(error)")
             }
         }
     }
