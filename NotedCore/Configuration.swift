@@ -9,17 +9,10 @@ public struct NotedCoreConfiguration {
         case staging = "staging"
         case production = "prod"
         
-        var baseURL: String {
-            switch self {
-            case .development:
-                return "http://localhost:8080"
-            case .staging:
-                return "https://staging-api.notedcore.com"
-            case .production:
-                return "https://api.notedcore.com"
-            }
-        }
-        
+        // NOTE: no baseURL — NotedCore is a fully offline on-device app with no backend.
+        // The former staging/production API endpoints were removed in the offline
+        // rearchitecture (PR0); nothing read this property.
+
         var logLevel: LogLevel {
             switch self {
             case .development:
@@ -325,14 +318,13 @@ public class ConfigurationManager {
         
         let memoryUsage = ProcessInfo.processInfo.physicalMemory
         let diskSpace = checkDiskSpace()
-        let networkReachable = checkNetworkReachability()
-        
+
         return HealthCheckResult(
             status: validationIssues.isEmpty ? .healthy : .degraded,
             issues: validationIssues,
             memoryUsage: memoryUsage,
             diskSpace: diskSpace,
-            networkReachable: networkReachable,
+            networkReachable: false, // offline-only app: no network by design
             timestamp: Date()
         )
     }
@@ -346,10 +338,6 @@ public class ConfigurationManager {
         return 0
     }
     
-    private func checkNetworkReachability() -> Bool {
-        // Simplified network check
-        return true
-    }
 }
 
 // MARK: - Health Check Result

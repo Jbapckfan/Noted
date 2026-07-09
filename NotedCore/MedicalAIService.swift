@@ -1,299 +1,36 @@
 import Foundation
 
-/// Unified Medical AI Service with Offline and Online modes
-/// Offline: Uses MLX with Phi-3-mini (on-device)
-/// Online: Uses Anthropic Claude API (superior medical accuracy)
+/// On-device medical note service — FULLY OFFLINE.
+///
+/// Note generation runs entirely on-device (MLX / Apple NLP via `MaximumQualityOfflineAI`).
+/// No network, no API keys, no cloud fallback. The Anthropic/Claude "online" and "auto"
+/// modes — including the `checkOnlineAvailability()` connectivity ping that fired on first
+/// `.shared` access — were removed in the offline rearchitecture (PR0). This type is kept
+/// (it's the entry point used by `EncounterSessionManager` and extended by
+/// `TrainedModelSummarizer`); only its egress was excised.
 @MainActor
 class MedicalAIService: ObservableObject {
     static let shared = MedicalAIService()
 
-    enum AIMode {
-        case offline // MLX Phi-3
-        case online  // Anthropic Claude
-        case auto    // Use online if available, fallback to offline
-    }
-
-    @Published var currentMode: AIMode = .auto
-    @Published var isOnlineAvailable: Bool = false
     @Published var isOfflineModelLoaded: Bool = false
 
-    private let anthropicEndpoint = "https://api.anthropic.com/v1/messages"
-
-    // Access API key from UserDefaults (set via AISettingsView)
-    private var anthropicAPIKey: String? {
-        UserDefaults.standard.string(forKey: "anthropic_api_key")
-    }
-
-    private init() {
-        checkOnlineAvailability()
-    }
+    private init() {}
 
     // MARK: - Main Entry Point
 
+    /// Generate a note from an analyzed conversation. Always on-device.
     func generateMedicalNote(from conversation: ConversationAnalysis, noteType: NoteType) async -> String {
-        let mode = determineMode()
-
-        switch mode {
-        case .online:
-            return await generateWithClaude(conversation: conversation, noteType: noteType)
-        case .offline:
-            return await generateWithMLX(conversation: conversation, noteType: noteType)
-        case .auto:
-            if isOnlineAvailable, let apiKey = anthropicAPIKey {
-                return await generateWithClaude(conversation: conversation, noteType: noteType)
-            } else {
-                return await generateWithMLX(conversation: conversation, noteType: noteType)
-            }
-        }
+        return await generateWithMLX(conversation: conversation, noteType: noteType)
     }
 
-    // MARK: - Online Mode (Anthropic Claude)
-
-    private func generateWithClaude(conversation: ConversationAnalysis, noteType: NoteType) async -> String {
-        guard let apiKey = anthropicAPIKey else {
-            return """
-            ⚠️ Online mode requires Anthropic API key
-            Please add your API key in Settings
-
-            Falling back to offline mode...
-            """
-        }
-
-        let systemPrompt = """
-        You are an expert medical scribe assistant. Generate a professional \(noteType.rawValue) from the provided medical encounter transcript.
-
-        Requirements:
-        - Use proper medical terminology
-        - Structure the note according to \(noteType.rawValue) format
-        - Be concise but comprehensive
-        - Include relevant clinical details
-        - Maintain professional medical documentation standards
-        """
-
-        let userPrompt = """
-        Generate a \(noteType.rawValue) from this medical encounter:
-
-        Chief Complaint: \(conversation.chiefComplaint)
-
-        Transcript:
-        \(conversation.originalText)
-
-        Medical History: \(conversation.medicalHistory.joined(separator: ", "))
-        Current Medications: \(conversation.medications.joined(separator: ", "))
-        """
-
-        let requestBody: [String: Any] = [
-            "model": "claude-3-5-sonnet-20241022",
-            "max_tokens": 2048,
-            "temperature": 0.3,
-            "system": systemPrompt,
-            "messages": [
-                ["role": "user", "content": userPrompt]
-            ]
-        ]
-
-        do {
-            guard let url = URL(string: anthropicEndpoint) else {
-                throw NSError(domain: "Invalid URL", code: -1)
-            }
-
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-            request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-            request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
-
-            let (data, response) = try await URLSession.shared.data(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-                throw NSError(domain: "API Error", code: -1)
-            }
-
-            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let content = json["content"] as? [[String: Any]],
-                  let text = content.first?["text"] as? String else {
-                throw NSError(domain: "Parse Error", code: -1)
-            }
-
-            return """
-            \(text)
-
-            ---
-            Generated by Claude 3.5 Sonnet (Online Mode)
-            🌐 Internet connection used
-            """
-
-        } catch {
-            print("Claude API Error: \(error)")
-            return """
-            ⚠️ Online mode failed: \(error.localizedDescription)
-
-            Falling back to offline mode...
-
-            \(await generateWithMLX(conversation: conversation, noteType: noteType))
-            """
-        }
-    }
-
-    // MARK: - Offline Mode (MAXIMUM QUALITY using all iOS native AI)
+    // MARK: - On-Device Generation
 
     private func generateWithMLX(conversation: ConversationAnalysis, noteType: NoteType) async -> String {
-        // Use MAXIMUM quality offline AI leveraging:
-        // - Apple Neural Engine (A18 Pro - 35 TOPS)
-        // - NaturalLanguage framework with word embeddings
-        // - Semantic analysis and sentiment analysis
-        // - Advanced medical entity extraction
-        // - Clinical context understanding
-
+        // Maximum-quality offline generation leveraging the Apple Neural Engine,
+        // NaturalLanguage embeddings, and on-device medical entity extraction.
         return await MaximumQualityOfflineAI.shared.generateProfessionalNote(
             from: conversation,
             noteType: noteType
         )
-    }
-
-    private func generateWithPhi3(conversation: ConversationAnalysis, noteType: NoteType) async -> String {
-        let prompt = """
-        <|system|>
-        You are a medical scribe. Generate a professional \(noteType.rawValue).
-        <|end|>
-        <|user|>
-        Chief Complaint: \(conversation.chiefComplaint)
-
-        Transcript:
-        \(conversation.originalText)
-
-        History: \(conversation.medicalHistory.joined(separator: ", "))
-        Medications: \(conversation.medications.joined(separator: ", "))
-
-        Generate a structured medical note.
-        <|end|>
-        <|assistant|>
-        """
-
-        // Use Phi3MLXService to generate
-        let result = await Phi3MLXService.shared.generate(prompt: prompt, maxTokens: 1024)
-
-        return """
-        \(result)
-
-        ---
-        Generated by Phi-3-mini (Offline Mode)
-        📱 100% On-Device - No internet used
-        """
-    }
-
-    // MARK: - Mode Determination
-
-    private func determineMode() -> AIMode {
-        switch currentMode {
-        case .auto:
-            return isOnlineAvailable && anthropicAPIKey != nil ? .online : .offline
-        case .online, .offline:
-            return currentMode
-        }
-    }
-
-    private func checkOnlineAvailability() {
-        Task {
-            // Simple connectivity check
-            guard let url = URL(string: "https://api.anthropic.com") else { return }
-
-            do {
-                let (_, response) = try await URLSession.shared.data(from: url)
-                if let httpResponse = response as? HTTPURLResponse {
-                    await MainActor.run {
-                        isOnlineAvailable = httpResponse.statusCode < 500
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    isOnlineAvailable = false
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Settings View for API Key
-
-import SwiftUI
-
-struct AISettingsView: View {
-    @AppStorage("anthropic_api_key") private var apiKey: String = ""
-    @StateObject private var aiService = MedicalAIService.shared
-
-    var body: some View {
-        Form {
-            Section(header: Text("AI Mode")) {
-                Picker("Mode", selection: $aiService.currentMode) {
-                    Text("Auto (Best Available)").tag(MedicalAIService.AIMode.auto)
-                    Text("Online (Claude API)").tag(MedicalAIService.AIMode.online)
-                    Text("Offline (On-Device)").tag(MedicalAIService.AIMode.offline)
-                }
-
-                HStack {
-                    Text("Online Status")
-                    Spacer()
-                    Image(systemName: aiService.isOnlineAvailable ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundColor(aiService.isOnlineAvailable ? .green : .red)
-                }
-
-                HStack {
-                    Text("Offline Model")
-                    Spacer()
-                    Image(systemName: aiService.isOfflineModelLoaded ? "checkmark.circle.fill" : "circle")
-                        .foregroundColor(aiService.isOfflineModelLoaded ? .green : .gray)
-                }
-            }
-
-            Section(header: Text("Anthropic API Key (Optional)"),
-                    footer: Text("Get your API key from console.anthropic.com\nRequired for online mode. Typical cost: $0.01-0.05 per note.")) {
-                SecureField("sk-ant-...", text: $apiKey)
-                    .textContentType(.password)
-                    .autocapitalization(.none)
-
-                if !apiKey.isEmpty {
-                    Button("Clear") {
-                        apiKey = ""
-                    }
-                }
-            }
-
-            Section(header: Text("Current Reality")) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("**Online Mode (Claude 3.5 Sonnet):**")
-                        .font(.headline)
-                        .foregroundColor(.green)
-                    Text("✅ Professional scribe-quality notes")
-                    Text("✅ Accurate medical reasoning")
-                    Text("✅ Handles complex cases perfectly")
-                    Text("✅ Works right now with API key")
-                    Text("⚠️ Requires internet + API key")
-                    Text("💰 Cost: ~$0.01-0.05 per note")
-
-                    Divider()
-
-                    Text("**Offline Mode (Apple NLP + Patterns):**")
-                        .font(.headline)
-                        .foregroundColor(.orange)
-                    Text("✅ 100% private & free")
-                    Text("✅ Works in airplane mode")
-                    Text("✅ No API key needed")
-                    Text("⚠️ Basic quality - needs manual editing")
-                    Text("⚠️ Not AI - uses pattern matching")
-                    Text("⚠️ Cannot match Heidi/Suki quality offline")
-
-                    Divider()
-
-                    Text("**Recommendation:**")
-                        .font(.headline)
-                    Text("Use Online Mode for professional results")
-                        .foregroundColor(.green)
-                }
-                .font(.caption)
-            }
-        }
-        .navigationTitle("AI Settings")
     }
 }
