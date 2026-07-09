@@ -1,3 +1,4 @@
+#if canImport(WhisperKit)
 import SwiftUI
 import Speech
 import AVFoundation
@@ -301,4 +302,4 @@ extension EncounterWorkflowView {
             .cornerRadius(12)
             .shadow(radius: 2)
     }
-}
+}#endif

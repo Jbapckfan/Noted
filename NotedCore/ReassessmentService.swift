@@ -1,3 +1,4 @@
+#if canImport(WhisperKit)
 import SwiftUI
 import Combine
 
@@ -379,4 +380,4 @@ extension ContentView {
         //     ReassessmentView()
         // }
     }
-}
+}#endif

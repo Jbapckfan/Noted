@@ -1,3 +1,4 @@
+#if canImport(WhisperKit)
 import Foundation
 import WhisperKit
 import AVFoundation
@@ -783,3 +784,4 @@ extension MedicalSummarizerService {
         }
     }
 }
+#endif

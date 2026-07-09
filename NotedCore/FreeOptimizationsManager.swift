@@ -1,3 +1,4 @@
+#if canImport(WhisperKit)
 import Foundation
 import WhisperKit
 import NaturalLanguage
@@ -293,4 +294,4 @@ extension String {
         }
         return sentences
     }
-}
+}#endif

@@ -1,3 +1,4 @@
+#if canImport(WhisperKit)
 import Foundation
 #if canImport(AppIntents)
 import AppIntents
@@ -39,4 +40,5 @@ struct BookmarkEncounterIntent: AppIntent {
         return .result()
     }
 }
+#endif
 #endif

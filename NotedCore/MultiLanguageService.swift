@@ -1,3 +1,4 @@
+#if canImport(WhisperKit)
 import Foundation
 import WhisperKit
 
@@ -391,4 +392,4 @@ enum MultiLanguageError: LocalizedError {
             return "Failed to detect language from audio"
         }
     }
-}
+}#endif

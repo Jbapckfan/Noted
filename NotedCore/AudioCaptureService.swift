@@ -1,3 +1,4 @@
+#if canImport(WhisperKit)
 import AVFoundation
 import Accelerate
 
@@ -576,3 +577,4 @@ final class AudioCaptureService: NSObject, ObservableObject {
         prioritizeBluetoothMicrophone()
     }
 }
+#endif

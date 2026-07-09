@@ -1,23 +1,18 @@
 //  OnDeviceNoteEngine.swift
 //  Composes the two real engines into one NoteEngine so PR3's serial GenerationWorker runs
-//  unchanged: `.transcribe` goes to WhisperKit (ANE/CPU); the generative stages go to MLX (GPU).
-//  Plus the factory seam that selects the deterministic MockNoteEngine in the simulator and the
-//  real stack on device — this is what finally lets the whole app run in the simulator (PR3's payoff).
-//
-//  NOTE on overlap: routing transcription through the same worker keeps things simple and correct;
-//  it does serialize transcribe with generation. The important overlap (capture of N+1 via
-//  CaptureController while N generates) already holds. A dedicated ANE TranscriptionWorker for
-//  transcribe∥generate is a later optimization (PR7 governance), not needed for v1 correctness.
+//  unchanged: `.transcribe` goes to Apple Speech (on-device); the generative stages go to MLX.
+//  Plus the factory that selects the deterministic MockNoteEngine in the simulator (or when no
+//  model is bundled) and the real stack on device.
 
 import Foundation
 import NotedCoreKit
 
-#if canImport(MLXLLM) && canImport(WhisperKit)
+#if canImport(MLXLLM)
 public struct OnDeviceNoteEngine: NoteEngine {
-    let transcriber: WhisperTranscriber
+    let transcriber: SpeechTranscriber
     let mlx: MLXNoteEngine
 
-    public init(transcriber: WhisperTranscriber, mlx: MLXNoteEngine) {
+    public init(transcriber: SpeechTranscriber, mlx: MLXNoteEngine) {
         self.transcriber = transcriber
         self.mlx = mlx
     }
@@ -34,24 +29,22 @@ public struct OnDeviceNoteEngine: NoteEngine {
 #endif
 
 /// Picks the engine for the current build: the GPU-free mock in the simulator (so the full
-/// pipeline runs and is demoable without Metal), the real MLX + WhisperKit stack on device.
+/// pipeline runs and is demoable without Metal), the real MLX + Apple Speech stack on device when
+/// a model is actually bundled, and the mock otherwise (never crashes on a missing model).
 public enum NoteEngineFactory {
     public static func make(audioDirectory: URL, modelPath: String) -> NoteEngine {
         #if targetEnvironment(simulator)
         return MockNoteEngine()
-        #elseif canImport(MLXLLM) && canImport(WhisperKit)
-        // Real engine only when a model is actually bundled; otherwise fall back to the mock so the
-        // app never crashes trying to load a missing model. Drop the model dir in and it activates.
+        #elseif canImport(MLXLLM)
         if !modelPath.isEmpty && FileManager.default.fileExists(atPath: modelPath) {
             return OnDeviceNoteEngine(
-                transcriber: WhisperTranscriber(audioDirectory: audioDirectory),
+                transcriber: SpeechTranscriber(audioDirectory: audioDirectory),
                 mlx: MLXNoteEngine(modelPath: modelPath)
             )
         }
         return MockNoteEngine()
         #else
-        // mlx-swift-examples (MLXLLM/MLXLMCommon) not linked yet — run the deterministic mock until
-        // the real engine package is added (see docs/INTEGRATION.md, step 3).
+        // mlx-swift-examples (MLXLLM/MLXLMCommon) not linked yet — deterministic mock until then.
         return MockNoteEngine()
         #endif
     }

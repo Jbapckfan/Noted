@@ -218,7 +218,9 @@ final class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDeleg
         
         // Start recording
         do {
+            #if canImport(WhisperKit)
             await EncounterController.shared.start(room: room, complaint: complaint)
+            #endif
             
             // Play sound to confirm
             AudioServicesPlaySystemSound(1054) // Tink sound
@@ -257,7 +259,9 @@ final class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDeleg
         let requireSaveConfirmation = message["requireSaveConfirmation"] as? Bool ?? true
         
         // Stop recording
+        #if canImport(WhisperKit)
         EncounterController.shared.stop()
+        #endif
         
         // Generate save code
         let saveCode = generateSaveCode(for: encounterId)
@@ -304,7 +308,9 @@ final class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDeleg
         let label = message["label"] as? String ?? "Bookmark"
         let bookmarkNumber = message["bookmarkNumber"] as? Int ?? 0
         
+        #if canImport(WhisperKit)
         EncounterController.shared.bookmark("\(label) #\(bookmarkNumber)")
+        #endif
         
         // Visual/audio feedback on iPhone/iPad
         AudioServicesPlaySystemSound(1057) // Tick sound

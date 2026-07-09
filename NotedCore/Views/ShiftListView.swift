@@ -171,6 +171,7 @@ struct ShiftListView: View {
                     .background(model.isRecording ? Color.red : Color.blue, in: Circle())
                     .shadow(radius: 10, y: 4)
             }
+            .accessibilityIdentifier("recordButton")
             .disabled(model.isProcessing)
             Text(model.isRecording ? "Recording — tap to stop" : "Tap to record")
                 .font(.caption).foregroundStyle(.secondary)

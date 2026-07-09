@@ -1,3 +1,4 @@
+#if canImport(WhisperKit)
 import Foundation
 import Speech
 import AVFoundation
@@ -351,4 +352,4 @@ class VoiceCommandProcessor: NSObject, ObservableObject {
             userInfo: ["commands": commands]
         )
     }
-}
+}#endif

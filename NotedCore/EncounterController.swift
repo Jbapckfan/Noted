@@ -1,3 +1,4 @@
+#if canImport(WhisperKit)
 import Foundation
 
 @MainActor
@@ -33,3 +34,4 @@ final class EncounterController: ObservableObject {
     }
 }
 
+#endif

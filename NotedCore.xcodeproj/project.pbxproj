@@ -8,8 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		FE03FE03FE03FE03FE03FE03 /* NotedCoreKit in Frameworks */ = {isa = PBXBuildFile; productRef = FE02FE02FE02FE02FE02FE02 /* NotedCoreKit */; };
-		D0FE6ADA2E1F3F1F0019CD1F /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = D0FE6AD92E1F3F1F0019CD1F /* WhisperKit */; };
-		D0FE6ADC2E1F3F1F0019CD1F /* whisperkit-cli in Frameworks */ = {isa = PBXBuildFile; productRef = D0FE6ADB2E1F3F1F0019CD1F /* whisperkit-cli */; };
+		FE13FE13FE13FE13FE13FE13 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = FE11FE11FE11FE11FE11FE11 /* MLXLLM */; };
+		FE14FE14FE14FE14FE14FE14 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = FE12FE12FE12FE12FE12FE12 /* MLXLMCommon */; };
 		D0FE6AE32E1F6F0B0019CD1F /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = D0FE6AE22E1F6F0B0019CD1F /* MLX */; };
 		D0FE6AE52E1F6F0B0019CD1F /* MLXFFT in Frameworks */ = {isa = PBXBuildFile; productRef = D0FE6AE42E1F6F0B0019CD1F /* MLXFFT */; };
 		D0FE6AE72E1F6F0B0019CD1F /* MLXFast in Frameworks */ = {isa = PBXBuildFile; productRef = D0FE6AE62E1F6F0B0019CD1F /* MLXFast */; };
@@ -111,8 +111,8 @@
 				FE03FE03FE03FE03FE03FE03 /* NotedCoreKit in Frameworks */,
 				D0FE6AE32E1F6F0B0019CD1F /* MLX in Frameworks */,
 				D0FE6AE92E1F6F0B0019CD1F /* MLXLinalg in Frameworks */,
-				D0FE6ADA2E1F3F1F0019CD1F /* WhisperKit in Frameworks */,
-				D0FE6ADC2E1F3F1F0019CD1F /* whisperkit-cli in Frameworks */,
+				FE13FE13FE13FE13FE13FE13 /* MLXLLM in Frameworks */,
+				FE14FE14FE14FE14FE14FE14 /* MLXLMCommon in Frameworks */,
 				D0FE6AE72E1F6F0B0019CD1F /* MLXFast in Frameworks */,
 				D0FE6AEB2E1F6F0B0019CD1F /* MLXNN in Frameworks */,
 				D0FE6AE52E1F6F0B0019CD1F /* MLXFFT in Frameworks */,
@@ -204,8 +204,8 @@
 			name = NotedCore;
 			packageProductDependencies = (
 				FE02FE02FE02FE02FE02FE02 /* NotedCoreKit */,
-				D0FE6AD92E1F3F1F0019CD1F /* WhisperKit */,
-				D0FE6ADB2E1F3F1F0019CD1F /* whisperkit-cli */,
+				FE11FE11FE11FE11FE11FE11 /* MLXLLM */,
+				FE12FE12FE12FE12FE12FE12 /* MLXLMCommon */,
 				D0FE6AE22E1F6F0B0019CD1F /* MLX */,
 				D0FE6AE42E1F6F0B0019CD1F /* MLXFFT */,
 				D0FE6AE62E1F6F0B0019CD1F /* MLXFast */,
@@ -374,7 +374,7 @@
 			mainGroup = D037A5A42E1ED2A10015A53E;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				D0FE6AD82E1F3F1F0019CD1F /* XCRemoteSwiftPackageReference "WhisperKit" */,
+				FE10FE10FE10FE10FE10FE10 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */,
 				D0FE6AE12E1F6F0B0019CD1F /* XCRemoteSwiftPackageReference "mlx-swift" */,
 				FE01FE01FE01FE01FE01FE01 /* XCLocalSwiftPackageReference "NotedCoreKit" */,
 			);
@@ -997,12 +997,12 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		D0FE6AD82E1F3F1F0019CD1F /* XCRemoteSwiftPackageReference "WhisperKit" */ = {
+		FE10FE10FE10FE10FE10FE10 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/argmaxinc/WhisperKit";
+			repositoryURL = "https://github.com/ml-explore/mlx-swift-examples";
 			requirement = {
 				kind = revision;
-				revision = 3a380435ce1b28c488db301864f9b1de329a63e6;
+				revision = b0717631e37a7940b292eec11255d60029ed7a4d;
 			};
 		};
 		D0FE6AE12E1F6F0B0019CD1F /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
@@ -1027,15 +1027,15 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = NotedCoreKit;
 		};
-		D0FE6AD92E1F3F1F0019CD1F /* WhisperKit */ = {
+		FE11FE11FE11FE11FE11FE11 /* MLXLLM */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = D0FE6AD82E1F3F1F0019CD1F /* XCRemoteSwiftPackageReference "WhisperKit" */;
-			productName = WhisperKit;
+			package = FE10FE10FE10FE10FE10FE10 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
+			productName = MLXLLM;
 		};
-		D0FE6ADB2E1F3F1F0019CD1F /* whisperkit-cli */ = {
+		FE12FE12FE12FE12FE12FE12 /* MLXLMCommon */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = D0FE6AD82E1F3F1F0019CD1F /* XCRemoteSwiftPackageReference "WhisperKit" */;
-			productName = "whisperkit-cli";
+			package = FE10FE10FE10FE10FE10FE10 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
+			productName = MLXLMCommon;
 		};
 		D0FE6AE22E1F6F0B0019CD1F /* MLX */ = {
 			isa = XCSwiftPackageProductDependency;

@@ -1,3 +1,4 @@
+#if canImport(WhisperKit)
 import SwiftUI
 import AVFoundation
 
@@ -540,4 +541,4 @@ enum RecordingMode: CaseIterable {
 
 #Preview {
     ProfessionalRecordingView()
-}
+}#endif

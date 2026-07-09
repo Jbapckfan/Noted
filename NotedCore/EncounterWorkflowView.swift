@@ -1,3 +1,4 @@
+#if canImport(WhisperKit)
 import SwiftUI
 import AVFoundation
 import Combine
@@ -919,3 +920,4 @@ struct AudioLevelIndicator: View {
         }
     }
 }
+#endif

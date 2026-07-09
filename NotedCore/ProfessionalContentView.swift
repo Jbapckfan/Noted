@@ -1,3 +1,4 @@
+#if canImport(WhisperKit)
 import SwiftUI
 import AVFoundation
 #if canImport(UIKit)
@@ -694,3 +695,4 @@ struct ProfessionalQuickActionButton: View {
 // MARK: - Color Extension
 
 // Color extension moved to ColorExtensions.swift
+#endif

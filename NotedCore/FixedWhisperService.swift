@@ -1,3 +1,4 @@
+#if canImport(WhisperKit)
 import Foundation
 import WhisperKit
 import AVFoundation
@@ -260,4 +261,4 @@ extension FixedWhisperService {
 
         return matrix[m][n]
     }
-}
+}#endif

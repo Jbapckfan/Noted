@@ -1,3 +1,4 @@
+#if canImport(WhisperKit)
 import Foundation
 import Accelerate
 import AVFoundation
@@ -292,4 +293,4 @@ extension OptimizedTranscriptionService {
 
         return processed
     }
-}
+}#endif
