@@ -93,6 +93,26 @@ final class GroundingVerifierTests: XCTestCase {
         XCTAssertEqual(report.flags.first?.kind, .fabricatedPrecaution)
     }
 
+    // MARK: - Narrative (prose) grounding — the fabricated-HPI case
+
+    func testFabricatedHPINarrativeIsRemoved() {
+        // Transcript is only the clinician's opening question — the patient never spoke.
+        let transcript = "So can you tell me what brought you into the hospital today, the nurse was telling me that you're having some chest pain."
+        var facts = ClinicalFacts(chiefComplaint: "chest pain")
+        facts.hpi = "I was at work when I started feeling a tightness in my chest, it was like a squeezing sensation, and it's been getting worse over the past hour, I've also been experiencing shortness of breath."
+        let (grounded, report) = GroundingVerifier(transcript: transcript).filtered(facts)
+        XCTAssertNil(grounded.hpi, "a fabricated HPI (nothing the patient said) must be removed, not rendered")
+        XCTAssertTrue(report.flags.contains { $0.kind == .ungroundedNarrative })
+    }
+
+    func testGroundedHPINarrativeSurvives() {
+        let transcript = "Patient: I was at work and I started feeling tightness in my chest, a squeezing sensation, getting worse over the past hour, and I've had shortness of breath."
+        var facts = ClinicalFacts()
+        facts.hpi = "Started feeling tightness in the chest, a squeezing sensation getting worse over the past hour, with shortness of breath."
+        let (grounded, _) = GroundingVerifier(transcript: transcript).filtered(facts)
+        XCTAssertNotNil(grounded.hpi, "an HPI grounded in the patient's own words must survive")
+    }
+
     func testApprovedPrecautionPassesClean() {
         let allowed: Set<String> = ["Return for worsening chest pain"]
         let facts = ClinicalFacts(returnPrecautions: ["return for worsening chest pain"])

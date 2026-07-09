@@ -8,6 +8,7 @@ public struct VerificationFlag: Equatable, Codable, Sendable {
         case ungroundedRoute        // a route not present in the transcript
         case ungroundedLabValue     // a lab/result value not present near its test name
         case ungroundedVitalValue   // a vital sign value not present near its name
+        case ungroundedNarrative    // a free-text sentence (HPI/MDM/exam) not supported by the transcript
         case fabricatedPrecaution   // a return precaution outside the allowed library
     }
     public let kind: Kind
@@ -148,6 +149,14 @@ public struct GroundingVerifier {
             return true
         }
 
+        // Ground the FREE-TEXT narrative: keep only sentences whose content words are supported by
+        // the transcript. A fabricated HPI (e.g. the patient never actually spoke) shares almost no
+        // vocabulary with the transcript and is removed wholesale.
+        kept.hpi = groundNarrative(facts.hpi, field: "HPI narrative", into: &flags)
+        kept.reviewOfSystems = groundNarrative(facts.reviewOfSystems, field: "Review of systems", into: &flags)
+        kept.physicalExam = groundNarrative(facts.physicalExam, field: "Physical exam", into: &flags)
+        kept.mdm = groundNarrative(facts.mdm, field: "MDM narrative", into: &flags)
+
         if let allowed = allowedPrecautions {
             kept.returnPrecautions = facts.returnPrecautions.filter { p in
                 if allowed.contains(Self.normalize(p)) { return true }
@@ -157,6 +166,54 @@ public struct GroundingVerifier {
         }
 
         return (kept, VerificationReport(flags: flags))
+    }
+
+    /// Keep only the sentences of a free-text field whose content words appear in the transcript.
+    /// Returns nil if nothing survives (records a flag for what was dropped).
+    private func groundNarrative(_ text: String?, field: String, into flags: inout [VerificationFlag]) -> String? {
+        guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        let transcriptWords = Self.contentWords(normalizedTranscript)
+        guard !transcriptWords.isEmpty else {
+            flags.append(.init(kind: .ungroundedNarrative, claim: field, detail: "removed — no transcript to support it"))
+            return nil
+        }
+        let sentences = text.split(whereSeparator: { ".!?\n".contains($0) }).map(String.init)
+        var kept: [String] = []
+        var dropped = false
+        for sentence in sentences {
+            let words = Self.contentWords(Self.normalize(sentence))
+            guard !words.isEmpty else { continue }
+            let supported = words.filter { transcriptWords.contains($0) }.count
+            let overlap = Double(supported) / Double(words.count)
+            if overlap >= 0.5 {
+                kept.append(sentence.trimmingCharacters(in: .whitespaces))
+            } else {
+                dropped = true
+            }
+        }
+        if dropped {
+            flags.append(.init(kind: .ungroundedNarrative, claim: field,
+                               detail: "removed unsupported sentence(s) — not stated in the transcript"))
+        }
+        let result = kept.joined(separator: ". ").trimmingCharacters(in: .whitespaces)
+        if result.isEmpty { return nil }
+        return result.hasSuffix(".") ? result : result + "."
+    }
+
+    /// Meaningful (non-stopword) word tokens for coarse narrative grounding.
+    static func contentWords(_ normalizedText: String) -> Set<String> {
+        let stop: Set<String> = [
+            "the","and","that","this","with","for","was","were","are","been","being","has","have","had",
+            "you","your","not","from","but","all","can","will","would","could","should","into","out","about",
+            "some","any","his","her","him","she","they","them","their","our","which","what","when","where",
+            "who","how","why","also","then","than","just","like","get","got","now","one","two","today",
+        ]
+        return Set(
+            normalizedText
+                .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+                .map(String.init)
+                .filter { $0.count > 2 && !stop.contains($0) }
+        )
     }
 
     // MARK: - Matching primitives
