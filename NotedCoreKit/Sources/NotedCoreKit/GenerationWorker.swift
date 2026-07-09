@@ -79,10 +79,19 @@ public actor GenerationWorker {
         encounter.transition(to: stage.running)
         try? context.save()
 
-        let input = snapshot(of: encounter, kind: job.kind)
         do {
-            let output = try await engine.run(input)
-            apply(output, to: encounter)
+            switch job.kind {
+            case .note:
+                // DETERMINISTIC: the model extracted facts; the template writes the prose and the
+                // grounding verifier checks it. No model call here — writing can't hallucinate.
+                try applyNoteStage(encounter)
+            case .dischargeRender:
+                // DETERMINISTIC: render both versions from the verified discharge JSON.
+                try applyDischargeRenderStage(encounter)
+            case .transcribe, .extract, .dischargeExtract:
+                let output = try await engine.run(snapshot(of: encounter, kind: job.kind))
+                apply(output, to: encounter)
+            }
             encounter.transition(to: stage.done)
 
             job.state = .done
@@ -119,6 +128,47 @@ public actor GenerationWorker {
             dispositionTranscript: e.dispositionTranscript,
             resultsTrayJSON: e.resultsTrayJSON
         )
+    }
+
+    enum StageError: Error { case missingInput(String) }
+
+    /// `.note`: extracted facts -> deterministic HPI/MDM template + grounding verification.
+    private func applyNoteStage(_ e: Encounter) throws {
+        guard let extraction = e.extractionJSON, !extraction.isEmpty else {
+            throw StageError.missingInput("extractionJSON")
+        }
+        let facts = try ClinicalFacts.parse(extraction)
+        e.noteText = NoteTemplate.renderHPIandMDM(facts)
+        let report = GroundingVerifier(transcript: e.transcript ?? "").verify(facts)
+        e.verificationReport = Self.encode(report)
+    }
+
+    /// `.dischargeRender`: verified discharge JSON -> clinician + patient renderings, cross-layer
+    /// verification, and the patient-version reading-level check.
+    private func applyDischargeRenderStage(_ e: Encounter) throws {
+        guard let dischargeJSON = e.dischargeJSON, !dischargeJSON.isEmpty else {
+            throw StageError.missingInput("dischargeJSON")
+        }
+        let summary = try DischargeSummary.parse(dischargeJSON)
+        e.dischargeClinicianText = DischargeRenderer.renderClinician(summary)
+        e.dischargePatientText = DischargeRenderer.renderPatient(summary)
+        let report = DischargeVerifier(
+            extractionJSON: e.extractionJSON,
+            resultsTrayJSON: e.resultsTrayJSON,
+            dispositionTranscript: e.dispositionTranscript
+        ).verify(summary)
+        e.verificationReport = Self.encodeDischarge(report)
+    }
+
+    private static func encode(_ report: VerificationReport) -> String? {
+        (try? JSONEncoder().encode(report)).flatMap { String(data: $0, encoding: .utf8) }
+    }
+    private static func encodeDischarge(_ report: DischargeVerificationReport) -> String? {
+        // DischargeVerificationReport isn't Codable (structuralIssues are plain strings); serialize
+        // the grounding flags + issues into a small JSON object.
+        let flags = (try? JSONEncoder().encode(report.groundingFlags)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        let issues = (try? JSONEncoder().encode(report.structuralIssues)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        return "{\"flags\":\(flags),\"structuralIssues\":\(issues)}"
     }
 
     private func apply(_ out: GenerationOutput, to e: Encounter) {

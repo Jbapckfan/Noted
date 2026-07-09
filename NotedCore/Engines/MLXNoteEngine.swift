@@ -49,10 +49,14 @@ public actor MLXNoteEngine: NoteEngine {
 
     public func run(_ input: GenerationInput) async throws -> GenerationOutput {
         switch input.kind {
+        case .extract, .dischargeExtract:
+            break // model stages — the LLM extracts structured facts
         case .transcribe:
-            throw EngineError.unsupportedKind(.transcribe) // routed to WhisperTranscriber
-        case .extract, .note, .dischargeExtract, .dischargeRender:
-            break
+            throw EngineError.unsupportedKind(.transcribe)   // -> WhisperTranscriber
+        case .note, .dischargeRender:
+            // DETERMINISTIC stages — the GenerationWorker renders these from extracted facts via
+            // NoteTemplate / DischargeRenderer and never calls the model for them.
+            throw EngineError.unsupportedKind(input.kind)
         }
 
         try await ensureLoaded()
