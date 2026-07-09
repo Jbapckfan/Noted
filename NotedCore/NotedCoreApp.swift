@@ -2,15 +2,14 @@ import SwiftUI
 
 @main
 struct NotedCoreApp: App {
+    // Keep the legacy singletons initializing at launch (parity), but the ROOT is now the offline
+    // rearchitecture UI driven by NotedCoreKit.
     @StateObject private var appState = CoreAppState.shared
-    @StateObject private var watchConnectivity = WatchConnectivityManager.shared
-    @StateObject private var persistence = PersistenceController.shared
+    @State private var shift = ShiftViewModel()
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environmentObject(appState)
-                .environment(\.managedObjectContext, persistence.container.viewContext)
+            ShiftListView(model: shift)
         }
     }
 }
