@@ -16,12 +16,19 @@ public actor GenerationWorker {
     private let engine: NoteEngine
     private let maxAttempts: Int
     private let context: ModelContext
+    private let governor: GenerationGovernor
     private var isDraining = false
 
-    public init(container: ModelContainer, engine: NoteEngine, maxAttempts: Int = 3) {
+    public init(
+        container: ModelContainer,
+        engine: NoteEngine,
+        maxAttempts: Int = 3,
+        governor: GenerationGovernor = AlwaysDrainGovernor()
+    ) {
         self.container = container
         self.engine = engine
         self.maxAttempts = maxAttempts
+        self.governor = governor
         self.context = ModelContext(container)
     }
 
@@ -42,6 +49,16 @@ public actor GenerationWorker {
 
         var processed = 0
         while let job = nextPendingJob() {
+            switch governor.decisionNow() {
+            case .pauseQueue:
+                // Stop draining now; the job stays pending and a later drain() resumes it once the
+                // device recovers. Capture is unaffected — it holds no models.
+                return processed
+            case .coolDownBetweenJobs(let seconds):
+                try? await Task.sleep(for: .seconds(seconds))
+            case .drainNormally:
+                break
+            }
             await process(job)
             processed += 1
         }
