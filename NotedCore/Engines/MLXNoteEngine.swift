@@ -130,9 +130,18 @@ public actor MLXNoteEngine: NoteEngine {
         switch input.kind {
         case .extract:
             return """
-            Extract the clinical facts from this emergency department transcript as JSON \
-            (chief_complaint, hpi, pmh, meds, allergies, exam, differential). Quote all numbers \
-            verbatim; never invent values.
+            You are an emergency medicine scribe. Extract the clinical facts from this ED \
+            transcript as a single JSON object with EXACTLY these keys:
+            {"chief_complaint": string, "hpi": string, "review_of_systems": string,
+             "past_medical_history": [string], "allergies": [string],
+             "medications": [{"drug","dose","route","frequency"}],
+             "vitals": [{"name","value"}], "physical_exam": string,
+             "labs": [{"test","value","unit"}], "mdm": string, "diagnosis": string,
+             "differential": [string], "disposition": string, "return_precautions": [string]}
+
+            Rules: quote every number, dose, and result VERBATIM as spoken; never invent a value, a \
+            medication, a dose, or a result. Omit anything not stated. The HPI must be a fluent \
+            narrative in complete sentences; the MDM must state the reasoning and what was ruled out.
 
             Transcript:
             \(input.transcript ?? "")
