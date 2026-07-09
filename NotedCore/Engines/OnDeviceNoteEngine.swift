@@ -40,10 +40,15 @@ public enum NoteEngineFactory {
         #if targetEnvironment(simulator)
         return MockNoteEngine()
         #elseif canImport(MLXLLM) && canImport(WhisperKit)
-        return OnDeviceNoteEngine(
-            transcriber: WhisperTranscriber(audioDirectory: audioDirectory),
-            mlx: MLXNoteEngine(modelPath: modelPath)
-        )
+        // Real engine only when a model is actually bundled; otherwise fall back to the mock so the
+        // app never crashes trying to load a missing model. Drop the model dir in and it activates.
+        if !modelPath.isEmpty && FileManager.default.fileExists(atPath: modelPath) {
+            return OnDeviceNoteEngine(
+                transcriber: WhisperTranscriber(audioDirectory: audioDirectory),
+                mlx: MLXNoteEngine(modelPath: modelPath)
+            )
+        }
+        return MockNoteEngine()
         #else
         // mlx-swift-examples (MLXLLM/MLXLMCommon) not linked yet — run the deterministic mock until
         // the real engine package is added (see docs/INTEGRATION.md, step 3).
