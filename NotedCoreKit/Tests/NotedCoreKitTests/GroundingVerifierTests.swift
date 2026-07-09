@@ -119,4 +119,185 @@ final class GroundingVerifierTests: XCTestCase {
         let report = GroundingVerifier(transcript: "t", allowedPrecautions: allowed).verify(facts)
         XCTAssertTrue(report.isClean)
     }
+
+    // MARK: - Unit-aware numeric grounding (Safety Kernel v1a)
+
+    /// The lethal case: transcript says micrograms, the draft claims milligrams (a 1000x error).
+    /// The number matches; the unit must not be ignored.
+    func testFentanylMicrogramVsMilligramIsCaught() {
+        let transcript = "We gave fentanyl 50 micrograms IV for pain."
+        let facts = ClinicalFacts(medications: [Medication(drug: "fentanyl", dose: "50 mg", route: "IV")])
+        let report = GroundingVerifier(transcript: transcript).verify(facts)
+        XCTAssertTrue(report.flags.contains { $0.kind == .ungroundedDose },
+                      "50 mg must not ground against '50 micrograms': \(report.flags)")
+        let (grounded, _) = GroundingVerifier(transcript: transcript).filtered(facts)
+        XCTAssertEqual(grounded.medications.first?.dose, nil,
+                       "the mismatched dose must be stripped, the drug kept")
+        XCTAssertEqual(grounded.medications.first?.drug, "fentanyl")
+    }
+
+    /// Lab units: potassium 3.2 mEq/L must not launder a claimed 3.2 mg/dL.
+    func testLabValueUnitMismatchIsRemoved() {
+        let transcript = "The potassium came back at 3.2 mEq/L."
+        let inValue = ClinicalFacts(labs: [LabResult(test: "potassium", value: "3.2 mg/dL")])
+        let inField = ClinicalFacts(labs: [LabResult(test: "potassium", value: "3.2", unit: "mg/dL")])
+        for facts in [inValue, inField] {
+            let (grounded, report) = GroundingVerifier(transcript: transcript).filtered(facts)
+            XCTAssertTrue(grounded.labs.isEmpty, "a wrong-unit lab value must be removed: \(report.flags)")
+            XCTAssertEqual(report.flags.first?.kind, .ungroundedLabValue)
+        }
+    }
+
+    /// The matching unit still grounds — no over-rejection of a correct value.
+    func testCorrectUnitStillGrounds() {
+        let transcript = "Give aspirin 324 mg to chew now."
+        let facts = ClinicalFacts(medications: [Medication(drug: "aspirin", dose: "324 mg")])
+        let report = GroundingVerifier(transcript: transcript).verify(facts)
+        XCTAssertTrue(report.isClean, "324 mg matches 324 mg: \(report.flags)")
+    }
+
+    /// Spoken long-form unit grounds a short-form claim ("milligrams" grounds "mg").
+    func testSpokenUnitLongFormGroundsShortForm() {
+        let transcript = "Start ibuprofen 400 milligrams."
+        let facts = ClinicalFacts(medications: [Medication(drug: "ibuprofen", dose: "400 mg")])
+        let report = GroundingVerifier(transcript: transcript).verify(facts)
+        XCTAssertTrue(report.isClean, "400 milligrams should ground 400 mg: \(report.flags)")
+    }
+
+    /// Policy: a claimed unit with NO unit spoken near the number is allowed (unverifiable, not
+    /// a mismatch) — we only reject a CONFLICTING unit, so we don't strip "4 mg" from "gave 4 of morphine".
+    func testClaimedUnitWithNoTranscriptUnitIsAllowed() {
+        let transcript = "We gave morphine 4 in the field."
+        let facts = ClinicalFacts(medications: [Medication(drug: "morphine", dose: "4 mg")])
+        let report = GroundingVerifier(transcript: transcript).verify(facts)
+        XCTAssertTrue(report.isClean, "no spoken unit → allow the number: \(report.flags)")
+    }
+
+    // MARK: - Per-field medication pruning (route / frequency)
+
+    /// A fabricated route is stripped from the medication, but the (grounded) drug survives.
+    func testFabricatedRouteIsBlankedNotKept() {
+        let transcript = "Give ceftriaxone IV now."
+        let facts = ClinicalFacts(medications: [Medication(drug: "ceftriaxone", route: "PO")])
+        let (grounded, report) = GroundingVerifier(transcript: transcript).filtered(facts)
+        XCTAssertEqual(grounded.medications.first?.drug, "ceftriaxone", "the drug was said; keep it")
+        XCTAssertNil(grounded.medications.first?.route, "PO was never said; strip the route")
+        XCTAssertTrue(report.flags.contains { $0.kind == .ungroundedRoute })
+    }
+
+    func testGroundedRouteSurvives() {
+        let transcript = "Give ceftriaxone IV now."
+        let facts = ClinicalFacts(medications: [Medication(drug: "ceftriaxone", route: "IV")])
+        let (grounded, _) = GroundingVerifier(transcript: transcript).filtered(facts)
+        XCTAssertEqual(grounded.medications.first?.route, "IV")
+    }
+
+    /// A fabricated frequency ("ten times daily") is neither flagged nor removed today — it must be.
+    func testFabricatedFrequencyIsBlanked() {
+        let transcript = "Start ibuprofen 400 mg."
+        let facts = ClinicalFacts(medications: [Medication(drug: "ibuprofen", dose: "400 mg", frequency: "ten times daily")])
+        let (grounded, report) = GroundingVerifier(transcript: transcript).filtered(facts)
+        XCTAssertNil(grounded.medications.first?.frequency, "an unsaid frequency must be stripped")
+        XCTAssertTrue(report.flags.contains { $0.kind == .ungroundedFrequency })
+    }
+
+    func testGroundedFrequencySurvives() {
+        let transcript = "Start ibuprofen 400 mg twice daily."
+        let facts = ClinicalFacts(medications: [Medication(drug: "ibuprofen", dose: "400 mg", frequency: "twice daily")])
+        let (grounded, _) = GroundingVerifier(transcript: transcript).filtered(facts)
+        XCTAssertEqual(grounded.medications.first?.frequency, "twice daily")
+    }
+
+    // MARK: - Comparator laundering (bounded result → exact value)
+
+    /// "troponin less than 0.01" (below assay) must NOT be laundered into an exact "0.01".
+    func testBoundedResultNotLaunderedToExactValue() {
+        let transcript = "The troponin is less than 0.01."
+        let facts = ClinicalFacts(labs: [LabResult(test: "troponin", value: "0.01")])
+        let (grounded, report) = GroundingVerifier(transcript: transcript).filtered(facts)
+        XCTAssertTrue(grounded.labs.isEmpty, "an exact value must not ground against a '<' bound: \(report.flags)")
+    }
+
+    // MARK: - Adversarial hardening (found by an adversary attacking v1a)
+
+    /// D1: a route must not ground on a substring of an unrelated word ("iv" inside "give").
+    func testRouteNotGroundedBySubstringOfUnrelatedWord() {
+        let transcript = "Give aspirin 324 mg PO." // "give" contains "iv"
+        let facts = ClinicalFacts(medications: [Medication(drug: "aspirin", dose: "324 mg", route: "IV")])
+        let (grounded, report) = GroundingVerifier(transcript: transcript).filtered(facts)
+        XCTAssertNil(grounded.medications.first?.route, "IV must not ground on the 'iv' inside 'give'")
+        XCTAssertTrue(report.flags.contains { $0.kind == .ungroundedRoute })
+    }
+
+    func testRoutePOGroundsAsWholeWord() {
+        let transcript = "Give aspirin 324 mg PO now."
+        let facts = ClinicalFacts(medications: [Medication(drug: "aspirin", dose: "324 mg", route: "PO")])
+        let (grounded, _) = GroundingVerifier(transcript: transcript).filtered(facts)
+        XCTAssertEqual(grounded.medications.first?.route, "PO")
+    }
+
+    /// D2: a range dose whose unit trails the second number must still be unit-checked.
+    func testRangeDoseUnitMismatchIsCaught() {
+        let transcript = "Give hydromorphone 1 to 2 mg IV."
+        let facts = ClinicalFacts(medications: [Medication(drug: "hydromorphone", dose: "1-2 mcg", route: "IV")])
+        let (grounded, _) = GroundingVerifier(transcript: transcript).filtered(facts)
+        XCTAssertNil(grounded.medications.first?.dose, "1-2 mcg must not ground against '1 to 2 mg'")
+    }
+
+    /// D3: Greek small mu (U+03BC) must be recognized as micrograms, not slip past the unit check.
+    func testGreekMuMicrogramVsMilligramIsCaught() {
+        let transcript = "We gave fentanyl 50 \u{03BC}g IV."
+        let facts = ClinicalFacts(medications: [Medication(drug: "fentanyl", dose: "50 mg", route: "IV")])
+        let (grounded, _) = GroundingVerifier(transcript: transcript).filtered(facts)
+        XCTAssertNil(grounded.medications.first?.dose, "50 mg must not ground against 50 μg (greek mu)")
+    }
+
+    /// D4: a per-kg/per-min rate must not be laundered into a flat dose (and vice-versa).
+    func testDripRateNotLaunderedToFlatDose() {
+        let transcript = "Start norepinephrine 0.1 mcg/kg/min."
+        let facts = ClinicalFacts(medications: [Medication(drug: "norepinephrine", dose: "0.1 mcg")])
+        let (grounded, _) = GroundingVerifier(transcript: transcript).filtered(facts)
+        XCTAssertNil(grounded.medications.first?.dose, "a per-kg/min rate must not ground a flat mcg dose")
+    }
+
+    func testWeightBasedDoseNotLaunderedToAbsolute() {
+        let transcript = "Vancomycin 15 mg/kg IV."
+        let facts = ClinicalFacts(medications: [Medication(drug: "vancomycin", dose: "15 mg", route: "IV")])
+        let (grounded, _) = GroundingVerifier(transcript: transcript).filtered(facts)
+        XCTAssertNil(grounded.medications.first?.dose, "15 mg/kg must not render as a flat 15 mg")
+    }
+
+    /// The correctly-stated rate still grounds — no over-rejection.
+    func testDripRateGroundsWhenClaimedWithRate() {
+        let transcript = "Start norepinephrine 0.1 mcg/kg/min."
+        let facts = ClinicalFacts(medications: [Medication(drug: "norepinephrine", dose: "0.1 mcg/kg/min")])
+        let (grounded, _) = GroundingVerifier(transcript: transcript).filtered(facts)
+        XCTAssertEqual(grounded.medications.first?.dose, "0.1 mcg/kg/min")
+    }
+
+    /// D5: the "under"/"below" comparator vocabulary must also block laundering a bound to an exact value.
+    func testUnderComparatorNotLaundered() {
+        for phrase in ["under", "below"] {
+            let transcript = "The troponin is \(phrase) 0.01."
+            let facts = ClinicalFacts(labs: [LabResult(test: "troponin", value: "0.01")])
+            let (grounded, _) = GroundingVerifier(transcript: transcript).filtered(facts)
+            XCTAssertTrue(grounded.labs.isEmpty, "'\(phrase) 0.01' must not ground exact 0.01")
+        }
+    }
+
+    /// D6: a fabricated frequency must not ground on an unrelated word ("TID" inside "tidal").
+    func testFabricatedFrequencyNotGroundedByUnrelatedWord() {
+        let transcript = "Tidal volume was 500 on the vent; give ceftriaxone 1 g IV."
+        let facts = ClinicalFacts(medications: [Medication(drug: "ceftriaxone", dose: "1 g", route: "IV", frequency: "TID")])
+        let (grounded, _) = GroundingVerifier(transcript: transcript).filtered(facts)
+        XCTAssertNil(grounded.medications.first?.frequency, "TID must not ground on 'tidal'")
+    }
+
+    /// FN1: an abbreviated frequency stated in long form should ground (q4h ↔ "every 4 hours").
+    func testAbbreviatedFrequencyGroundsAgainstLongForm() {
+        let transcript = "Give ondansetron 4 mg IV every 4 hours."
+        let facts = ClinicalFacts(medications: [Medication(drug: "ondansetron", dose: "4 mg", route: "IV", frequency: "q4h")])
+        let (grounded, _) = GroundingVerifier(transcript: transcript).filtered(facts)
+        XCTAssertEqual(grounded.medications.first?.frequency, "q4h")
+    }
 }
