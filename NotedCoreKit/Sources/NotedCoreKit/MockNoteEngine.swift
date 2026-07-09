@@ -26,11 +26,36 @@ public struct MockNoteEngine: NoteEngine {
 
         switch input.kind {
         case .transcribe:
-            out.transcript = "[mock transcript for encounter \(short) from \(input.audioFileRelPath ?? "audio")]"
+            // A self-consistent demo encounter so the whole offline pipeline produces a full,
+            // grounded note in the simulator (the real MLX engine replaces this on device).
+            out.transcript = """
+            Doctor: What brings you in today?
+            Patient: I've had chest pain for about two hours. It's a pressure, right in the middle, \
+            and it goes into my left arm. I feel a little short of breath and sweaty.
+            Doctor: Any history of heart problems? Blood pressure, cholesterol?
+            Patient: I have high blood pressure and high cholesterol.
+            Doctor: Your blood pressure is 148 over 92, heart rate 96, and your oxygen is 98% on room air. \
+            I'm going to give you aspirin 324 milligrams to chew now. Your first troponin came back at 0.02.
+            Doctor: I'm going to keep you for observation and have cardiology see you.
+            """
 
         case .extract:
-            let src = (input.transcript ?? "").replacingOccurrences(of: "\"", with: "'")
-            out.extractionJSON = #"{"chief_complaint":"mock","source_len":\#(src.count)}"#
+            out.extractionJSON = """
+            {"chief_complaint":"Chest pain","hpi":"Patient reports two hours of substernal chest \
+            pressure radiating to the left arm, with mild shortness of breath and diaphoresis.",\
+            "review_of_systems":"Positive for chest pain, shortness of breath, and diaphoresis.",\
+            "past_medical_history":["hypertension","high cholesterol"],"allergies":[],\
+            "medications":[{"drug":"aspirin","dose":"324 milligrams","route":"chew","frequency":"now"}],\
+            "vitals":[{"name":"blood pressure","value":"148 over 92"},{"name":"heart rate","value":"96"},\
+            {"name":"oxygen","value":"98% on room air"}],\
+            "physical_exam":"","labs":[{"test":"troponin","value":"0.02","unit":""}],\
+            "mdm":"Acute coronary syndrome considered given exertional chest pressure with radiation; \
+            initial troponin negative. Aspirin given; serial troponins and cardiology consultation planned.",\
+            "diagnosis":"Chest pain, rule out acute coronary syndrome",\
+            "differential":["ACS","pulmonary embolism","aortic dissection","GERD"],\
+            "disposition":"Observation with serial troponins and cardiology evaluation",\
+            "return_precautions":[]}
+            """
 
         case .note:
             out.noteText = """

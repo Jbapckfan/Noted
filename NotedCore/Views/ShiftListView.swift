@@ -45,7 +45,26 @@ final class ShiftViewModel {
         )
 
         reload()
-        Task { _ = await worker.recoverAndDrain(); reload() }
+        Task {
+            _ = await worker.recoverAndDrain()
+            reload()
+            #if targetEnvironment(simulator)
+            await seedDemoIfEmpty()
+            #endif
+        }
+    }
+
+    /// Simulator only: run one demo encounter through the pipeline on first launch so the board
+    /// isn't empty and the offline flow is visible end-to-end.
+    private func seedDemoIfEmpty() async {
+        guard encounters.isEmpty else { return }
+        let e = Encounter(chiefComplaint: "Chest pain", phase: .captured)
+        e.audioFileRelPath = "\(e.id.uuidString).wav"
+        context.insert(e)
+        try? context.save()
+        try? GenerationQueue.startNotePipeline(for: e, in: context)
+        await worker.drain()
+        reload()
     }
 
     func reload() {
