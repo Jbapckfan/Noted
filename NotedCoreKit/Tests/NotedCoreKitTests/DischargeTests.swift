@@ -15,7 +15,7 @@ final class DischargeVerifierTests: XCTestCase {
         "Return immediately or call 911 for chest pain, pressure, or tightness — especially if it spreads to your arm, jaw, or back."
 
     private func verifier() -> DischargeVerifier {
-        DischargeVerifier(extractionJSON: layerA, resultsTrayJSON: layerB, dispositionTranscript: layerC)
+        DischargeVerifier(hpiGroundTruth: layerA, resultsTrayJSON: layerB, dispositionTranscript: layerC)
     }
 
     private func groundedSummary() -> DischargeSummary {
@@ -77,6 +77,95 @@ final class DischargeVerifierTests: XCTestCase {
         XCTAssertEqual(s.finalDiagnosis, "STEMI")
         XCTAssertEqual(s.medicationsPrescribed.first?.dose, "81 mg")
         XCTAssertEqual(s.pendingResults.first?.howCommunicated, "phone")
+    }
+
+    // MARK: - filtered() — the discharge gate (v1c), symmetric with the note path
+
+    func testFilteredKeepsGroundedDischargeUnchanged() {
+        let (clean, report) = verifier().filtered(groundedSummary())
+        XCTAssertEqual(clean.medicationsPrescribed.first?.dose, "25 mg")
+        XCTAssertEqual(clean.resultsExplained.first?.resultValueVerbatim, "0.02")
+        XCTAssertTrue(report.groundingFlags.isEmpty, "grounded discharge should have no removals: \(report.groundingFlags)")
+    }
+
+    func testFilteredBlanksUngroundedPrescribedDose() {
+        var s = groundedSummary()
+        s.medicationsPrescribed = [PrescribedMedication(drug: "metoprolol", dose: "250 mg", route: "PO", frequency: "BID")]
+        let (clean, _) = verifier().filtered(s)
+        XCTAssertEqual(clean.medicationsPrescribed.first?.drug, "metoprolol", "the drug was said; keep it")
+        XCTAssertEqual(clean.medicationsPrescribed.first?.dose, "", "250 mg was never said; blank it")
+    }
+
+    func testFilteredDropsMedWhoseDrugWasNeverSaid() {
+        var s = groundedSummary()
+        s.medicationsPrescribed = [PrescribedMedication(drug: "warfarin", dose: "5 mg", route: "PO", frequency: "daily")]
+        let (clean, _) = verifier().filtered(s)
+        XCTAssertTrue(clean.medicationsPrescribed.isEmpty, "warfarin was never in A/B/C — drop the whole prescription")
+    }
+
+    func testFilteredBlanksFabricatedQuantityAndDuration() {
+        var s = groundedSummary()
+        s.medicationsPrescribed = [PrescribedMedication(drug: "metoprolol", dose: "25 mg", route: "PO", frequency: "BID", duration: "for 30 days", quantity: "#90")]
+        let (clean, _) = verifier().filtered(s)
+        XCTAssertEqual(clean.medicationsPrescribed.first?.duration, "", "30-day duration was never said")
+        XCTAssertEqual(clean.medicationsPrescribed.first?.quantity, "", "#90 was never said")
+    }
+
+    func testFilteredDropsUngroundedExplainedResult() {
+        var s = groundedSummary()
+        s.resultsExplained = [ResultExplanation(test: "troponin", resultValueVerbatim: "0.20")]
+        let (clean, _) = verifier().filtered(s)
+        XCTAssertTrue(clean.resultsExplained.isEmpty, "0.20 was never a result in this encounter")
+    }
+
+    func testFilteredRemovesFabricatedPrecaution() {
+        var s = groundedSummary()
+        s.returnPrecautions = [cardiacPrecaution, "Return for sudden loss of vision in one eye."]
+        let (clean, _) = verifier().filtered(s)
+        XCTAssertEqual(clean.returnPrecautions, [cardiacPrecaution], "the out-of-library precaution is removed")
+    }
+
+    /// The laundering guard: a value present ONLY in the model's raw extraction (not the transcript)
+    /// must not survive — grounding is against the real encounter, not the model's own output.
+    func testFilteredGroundsAgainstTranscriptNotRawExtraction() {
+        // hpiGroundTruth (the transcript) never mentions hydralazine; a raw extraction might.
+        let v = DischargeVerifier(hpiGroundTruth: "Patient's chest pain resolved.", resultsTrayJSON: nil, dispositionTranscript: "Discharge home.")
+        var s = groundedSummary()
+        s.medicationsPrescribed = [PrescribedMedication(drug: "hydralazine", dose: "25 mg", route: "PO")]
+        let (clean, _) = v.filtered(s)
+        XCTAssertTrue(clean.medicationsPrescribed.isEmpty, "a drug only in raw extraction, not the transcript, must be dropped")
+    }
+
+    /// A drug named only as an allergy or a discontinuation must not become a discharge prescription.
+    func testFilteredDropsAllergenAndDiscontinuedDrug() {
+        let v = DischargeVerifier(hpiGroundTruth: "She is allergic to penicillin. We are stopping her lisinopril.",
+                                  resultsTrayJSON: nil, dispositionTranscript: "Discharge home.")
+        var s = groundedSummary()
+        s.medicationsPrescribed = [PrescribedMedication(drug: "penicillin", dose: "500 mg"),
+                                   PrescribedMedication(drug: "lisinopril", dose: "10 mg")]
+        let (clean, _) = v.filtered(s)
+        XCTAssertTrue(clean.medicationsPrescribed.isEmpty, "an allergen and a discontinued drug must not be prescribed")
+    }
+
+    /// Duration/quantity survive only when actually stated near a time/count word.
+    func testFilteredKeepsGroundedDurationAndQuantity() {
+        let v = DischargeVerifier(hpiGroundTruth: "Take amoxicillin 500 mg by mouth three times a day for 10 days; dispense 30 tablets.",
+                                  resultsTrayJSON: nil, dispositionTranscript: "Discharge home.")
+        var s = groundedSummary()
+        s.medicationsPrescribed = [PrescribedMedication(drug: "amoxicillin", dose: "500 mg", route: "PO", frequency: "TID", duration: "for 10 days", quantity: "30 tablets")]
+        let (clean, _) = v.filtered(s)
+        XCTAssertEqual(clean.medicationsPrescribed.first?.duration, "for 10 days")
+        XCTAssertEqual(clean.medicationsPrescribed.first?.quantity, "30 tablets")
+    }
+
+    /// A duration whose number only appears elsewhere (an age) is blanked.
+    func testFilteredBlanksDurationRidingUnrelatedNumber() {
+        let v = DischargeVerifier(hpiGroundTruth: "This 30-year-old man had chest pain. Start metoprolol.",
+                                  resultsTrayJSON: nil, dispositionTranscript: "Home on metoprolol.")
+        var s = groundedSummary()
+        s.medicationsPrescribed = [PrescribedMedication(drug: "metoprolol", duration: "for 30 days")]
+        let (clean, _) = v.filtered(s)
+        XCTAssertEqual(clean.medicationsPrescribed.first?.duration, "", "'for 30 days' must not ride the '30' in '30-year-old'")
     }
 }
 

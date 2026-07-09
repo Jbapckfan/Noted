@@ -170,13 +170,17 @@ public actor GenerationWorker {
             throw StageError.missingInput("dischargeJSON")
         }
         let summary = try DischargeSummary.parse(dischargeJSON)
-        e.dischargeClinicianText = DischargeRenderer.renderClinician(summary)
-        e.dischargePatientText = DischargeRenderer.renderPatient(summary)
-        let report = DischargeVerifier(
-            extractionJSON: e.extractionJSON,
+        // GATE before render (symmetric with the note path): strip every ungrounded prescription
+        // field, explained result, and out-of-library precaution, and ground against the TRANSCRIPT
+        // — not the raw extraction JSON, which is unfiltered model output that could launder a
+        // hallucinated value back in.
+        let (clean, report) = DischargeVerifier(
+            hpiGroundTruth: e.transcript,
             resultsTrayJSON: e.resultsTrayJSON,
             dispositionTranscript: e.dispositionTranscript
-        ).verify(summary)
+        ).filtered(summary)
+        e.dischargeClinicianText = DischargeRenderer.renderClinician(clean)
+        e.dischargePatientText = DischargeRenderer.renderPatient(clean)
         e.verificationReport = Self.encodeDischarge(report)
     }
 

@@ -56,12 +56,16 @@ final class PipelineIntegrationTests: XCTestCase {
         let container = try tempStore()
         let ctx = ModelContext(container)
         let e = Encounter(chiefComplaint: "chest pain", phase: .dispositionCaptured)
-        e.extractionJSON = #"{"chief_complaint":"chest pain"}"#
+        // The transcript is the grounding source (not the raw extraction). It must contain what the
+        // discharge copies: metoprolol and its dose/route/frequency.
+        e.transcript = "We're sending you home on metoprolol 25 mg by mouth twice a day, follow up with cardiology in a week. Your troponin was negative."
         e.resultsTrayJSON = #"{"labs":[{"test":"troponin","value":"0.02"}]}"#
         e.dispositionTranscript = "Home on metoprolol 25 mg by mouth twice a day, follow up with cardiology."
         ctx.insert(e)
+        // return_precautions uses a real library entry (free-text precautions are gated out); it
+        // also carries a FABRICATED extra precaution that must be removed.
         let discharge = #"""
-        {"final_diagnosis":"chest pain, low risk","brief_clinical_course":"resolved","follow_up":[{"who":"cardiology"}],"return_precautions":["Return to the ER if it comes back."],"medications_prescribed":[{"drug":"metoprolol","dose":"25 mg","route":"PO","frequency":"BID"}]}
+        {"final_diagnosis":"chest pain, low risk","brief_clinical_course":"resolved","follow_up":[{"who":"cardiology"}],"return_precautions":["Return to the emergency department or call 911 if your symptoms get worse.","Return for sudden loss of vision in one eye."],"medications_prescribed":[{"drug":"metoprolol","dose":"25 mg","route":"PO","frequency":"BID"}]}
         """#
         try GenerationQueue.enqueue(.dischargeExtract, for: e, in: ctx)
 
@@ -73,6 +77,7 @@ final class PipelineIntegrationTests: XCTestCase {
         XCTAssertTrue(reloaded?.dischargeClinicianText?.contains("metoprolol 25 mg PO BID") == true)
         let patient = try XCTUnwrap(reloaded?.dischargePatientText)
         XCTAssertTrue(patient.contains("by mouth"), "PO expanded for the patient version")
-        XCTAssertTrue(patient.contains("emergency room"), "ER expanded")
+        XCTAssertTrue(patient.contains("emergency department"), "the library precaution flowed through the gate")
+        XCTAssertFalse(patient.contains("vision in one eye"), "the fabricated (non-library) precaution was gated out")
     }
 }

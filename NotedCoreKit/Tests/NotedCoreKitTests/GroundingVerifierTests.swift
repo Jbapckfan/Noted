@@ -300,4 +300,100 @@ final class GroundingVerifierTests: XCTestCase {
         let (grounded, _) = GroundingVerifier(transcript: transcript).filtered(facts)
         XCTAssertEqual(grounded.medications.first?.frequency, "q4h")
     }
+
+    // MARK: - Category grounding (v1b) — CC/PMH/allergies/diagnosis/differential/disposition
+
+    /// The headline v1b case: a transcript unrelated to the extracted labels yields NOTHING —
+    /// no fabricated chief complaint, diagnosis, differential, or disposition.
+    func testUnrelatedTranscriptRemovesAllFabricatedLabels() {
+        let transcript = "Patient here for a medication refill on their blood pressure pills; feeling well."
+        var facts = ClinicalFacts(chiefComplaint: "stroke", diagnosis: "STEMI", disposition: "admit to the ICU")
+        facts.pastMedicalHistory = ["end stage renal disease"]
+        facts.differential = ["aortic dissection", "pulmonary embolism"]
+        let (grounded, report) = GroundingVerifier(transcript: transcript).filtered(facts)
+        XCTAssertNil(grounded.chiefComplaint)
+        XCTAssertNil(grounded.diagnosis)
+        XCTAssertNil(grounded.disposition)
+        XCTAssertTrue(grounded.pastMedicalHistory.isEmpty)
+        XCTAssertTrue(grounded.differential.isEmpty)
+        XCTAssertTrue(report.flags.contains { $0.kind == .ungroundedField })
+    }
+
+    func testGroundedChiefComplaintAndDiagnosisSurvive() {
+        let transcript = "The patient reports crushing chest pain; this looks like a STEMI, activating the cath lab."
+        let facts = ClinicalFacts(chiefComplaint: "chest pain", diagnosis: "STEMI")
+        let (grounded, _) = GroundingVerifier(transcript: transcript).filtered(facts)
+        XCTAssertEqual(grounded.chiefComplaint, "chest pain")
+        XCTAssertEqual(grounded.diagnosis, "STEMI")
+    }
+
+    func testFabricatedAllergyIsRemoved() {
+        let transcript = "No mention of allergies here; we discussed the chest pain."
+        let facts = ClinicalFacts(allergies: ["penicillin"])
+        let (grounded, _) = GroundingVerifier(transcript: transcript).filtered(facts)
+        XCTAssertTrue(grounded.allergies.isEmpty, "a penicillin allergy never stated must be removed")
+    }
+
+    // MARK: - NKDA is asserted only when actually stated (v1b)
+
+    func testNKDAAssertedOnlyWhenStated() {
+        let stated = GroundingVerifier(transcript: "She has no known drug allergies.").filtered(ClinicalFacts(chiefComplaint: "cough")).facts
+        XCTAssertEqual(stated.allergies, ["No known drug allergies"], "an explicit NKDA statement grounds the assertion")
+
+        let silent = GroundingVerifier(transcript: "We talked about her cough.").filtered(ClinicalFacts(chiefComplaint: "cough")).facts
+        XCTAssertTrue(silent.allergies.isEmpty, "no allergy discussion → no NKDA assertion (empty, not fabricated)")
+    }
+
+    /// NKDA must NOT be asserted when the same transcript also documents a real allergy.
+    func testNKDANotAssertedWhenAllergyAlsoPresent() {
+        let t = "No allergies listed in the old chart, but she is allergic to sulfa."
+        let facts = GroundingVerifier(transcript: t).filtered(ClinicalFacts(chiefComplaint: "rash")).facts
+        XCTAssertFalse(facts.allergies.contains("No known drug allergies"), "a contradicting 'allergic to sulfa' must block the NKDA assertion")
+    }
+
+    // MARK: - Adversarial hardening round 2 (v1b/v1c) — 2-letter, negation, attribution
+
+    /// A 2-letter diagnosis abbreviation must not get a free pass (it has no content words).
+    func testTwoLetterDiagnosisRequiresWholeWordPresence() {
+        let unrelated = GroundingVerifier(transcript: "Patient here for a medication refill; feeling well.")
+        XCTAssertNil(unrelated.filtered(ClinicalFacts(diagnosis: "PE")).facts.diagnosis, "PE with no support must be removed")
+        let stated = GroundingVerifier(transcript: "CT confirms a PE in the right lower lobe.")
+        XCTAssertEqual(stated.filtered(ClinicalFacts(diagnosis: "PE")).facts.diagnosis, "PE", "PE stated as a word grounds")
+    }
+
+    func testNegatedDiagnosisIsRemoved() {
+        let facts = GroundingVerifier(transcript: "We ruled out STEMI on the ECG.").filtered(ClinicalFacts(diagnosis: "STEMI")).facts
+        XCTAssertNil(facts.diagnosis, "a ruled-OUT STEMI must not become the diagnosis")
+    }
+
+    func testFamilyHistoryNotLaunderedIntoPatientPMH() {
+        let facts = GroundingVerifier(transcript: "Her mother had a stroke in her sixties.").filtered({ var f = ClinicalFacts(); f.pastMedicalHistory = ["stroke"]; return f }()).facts
+        XCTAssertTrue(facts.pastMedicalHistory.isEmpty, "a family-history stroke must not become the patient's PMH")
+    }
+
+    func testHalfOverlapTwoWordDiagnosisIsRemoved() {
+        let facts = GroundingVerifier(transcript: "The aortic valve is normal on the echo.").filtered(ClinicalFacts(diagnosis: "aortic dissection")).facts
+        XCTAssertNil(facts.diagnosis, "one incidental word ('aortic') must not ground 'aortic dissection'")
+    }
+
+    // MARK: - Negated / allergen / discontinued drugs (shared root cause)
+
+    func testNegatedDrugIsNotGrounded() {
+        let transcript = "We are stopping his aspirin today; he is allergic to penicillin."
+        let facts = ClinicalFacts(medications: [Medication(drug: "aspirin"), Medication(drug: "penicillin")])
+        let (grounded, _) = GroundingVerifier(transcript: transcript).filtered(facts)
+        XCTAssertTrue(grounded.medications.isEmpty, "a discontinued drug and an allergen must not be recorded as active meds")
+    }
+
+    func testDrugNameSubstringOfAWordIsNotGrounded() {
+        let facts = ClinicalFacts(medications: [Medication(drug: "iron")])
+        let (grounded, _) = GroundingVerifier(transcript: "Treated in a controlled environment.").filtered(facts)
+        XCTAssertTrue(grounded.medications.isEmpty, "'iron' must not ground on 'environment'")
+    }
+
+    func testAffirmativelyGivenDrugStillGrounds() {
+        let facts = ClinicalFacts(medications: [Medication(drug: "aspirin")])
+        let (grounded, _) = GroundingVerifier(transcript: "We gave him aspirin in triage.").filtered(facts)
+        XCTAssertEqual(grounded.medications.first?.drug, "aspirin")
+    }
 }

@@ -21,7 +21,7 @@ public enum NoteTemplate {
         guard hasContent else { return "" }
 
         var sections: [String] = []
-        sections.append("*** AI DRAFT — every value below was checked against your transcript. Review before signing. ***")
+        sections.append("*** AI DRAFT — generated from your transcript; values not supported by it were removed (listed at the end). This is a draft, not a verified record: read and confirm every value before signing. ***")
 
         if let cc = facts.chiefComplaint, !cc.isEmpty {
             sections.append("CHIEF COMPLAINT: \(cc)")
@@ -35,7 +35,9 @@ public enum NoteTemplate {
         if !facts.pastMedicalHistory.isEmpty {
             sections.append("PAST MEDICAL HISTORY: \(facts.pastMedicalHistory.joined(separator: ", "))")
         }
-        sections.append("ALLERGIES: \(facts.allergies.isEmpty ? "No known drug allergies" : facts.allergies.joined(separator: ", "))")
+        // Never fabricate NKDA from an empty array — the verifier injects "No known drug allergies"
+        // only when the encounter actually stated it, so an empty list means "not addressed".
+        sections.append("ALLERGIES: \(facts.allergies.isEmpty ? "Not addressed" : facts.allergies.joined(separator: ", "))")
         if !facts.medications.isEmpty {
             var block = "MEDICATIONS:"
             for m in facts.medications {

@@ -10,6 +10,7 @@ public struct VerificationFlag: Equatable, Codable, Sendable {
         case ungroundedLabValue     // a lab/result value not present near its test name
         case ungroundedVitalValue   // a vital sign value not present near its name
         case ungroundedNarrative    // a free-text sentence (HPI/MDM/exam) not supported by the transcript
+        case ungroundedField        // a short field/list value (CC, PMH, allergy, dx, differential, disposition) not supported
         case fabricatedPrecaution   // a return precaution outside the allowed library
     }
     public let kind: Kind
@@ -60,7 +61,7 @@ public struct GroundingVerifier {
         var flags: [VerificationFlag] = []
 
         for med in facts.medications {
-            let drugGrounded = phraseGrounded(med.drug)
+            let drugGrounded = groundedAffirmatively(med.drug, cues: Self.medicationCues)
             if !drugGrounded {
                 flags.append(.init(kind: .ungroundedMedication, claim: med.drug,
                                    detail: "medication not mentioned in the transcript"))
@@ -125,8 +126,8 @@ public struct GroundingVerifier {
         // (worse) keeping a fabricated route/frequency on a real drug. A bad dose UNIT (mg vs mcg)
         // strips the dose, since a 1000x-off dose is worse than no dose.
         kept.medications = facts.medications.compactMap { med -> Medication? in
-            guard phraseGrounded(med.drug) else {
-                flags.append(.init(kind: .ungroundedMedication, claim: med.drug, detail: "removed — drug not said in the encounter"))
+            guard groundedAffirmatively(med.drug, cues: Self.medicationCues) else {
+                flags.append(.init(kind: .ungroundedMedication, claim: med.drug, detail: "removed — drug not said (or negated/withheld/an allergy) in the encounter"))
                 return nil
             }
             var m = med
@@ -177,6 +178,22 @@ public struct GroundingVerifier {
         kept.physicalExam = groundNarrative(facts.physicalExam, field: "Physical exam", into: &flags)
         kept.mdm = groundNarrative(facts.mdm, field: "MDM narrative", into: &flags)
 
+        // Short structured fields were previously passed through UNVERIFIED, so an unrelated
+        // transcript could still yield a chief complaint of "stroke", a diagnosis of "STEMI", or a
+        // disposition of "discharge home" with zero flags. Ground them against the transcript too.
+        kept.chiefComplaint = groundedField(facts.chiefComplaint, field: "Chief complaint", into: &flags)
+        kept.pastMedicalHistory = filterGroundedList(facts.pastMedicalHistory, field: "Past medical history", into: &flags)
+        kept.allergies = filterGroundedList(facts.allergies, field: "Allergy", into: &flags)
+        kept.diagnosis = groundedField(facts.diagnosis, field: "Diagnosis", into: &flags)
+        kept.differential = filterGroundedList(facts.differential, field: "Differential", into: &flags)
+        kept.disposition = groundedField(facts.disposition, field: "Disposition", into: &flags)
+
+        // "No known drug allergies" is an affirmative clinical claim — assert it ONLY if the
+        // encounter actually stated it, never as a default for an empty array (that was fabrication).
+        if kept.allergies.isEmpty, transcriptStatesNoAllergies() {
+            kept.allergies = ["No known drug allergies"]
+        }
+
         if let allowed = allowedPrecautions {
             kept.returnPrecautions = facts.returnPrecautions.filter { p in
                 if allowed.contains(Self.normalize(p)) { return true }
@@ -220,6 +237,58 @@ public struct GroundingVerifier {
         return result.hasSuffix(".") ? result : result + "."
     }
 
+    /// A short field (CC, diagnosis, disposition) survives only if its content words are supported
+    /// by the transcript; otherwise it is removed (returns nil) and flagged.
+    private func groundedField(_ text: String?, field: String, into flags: inout [VerificationFlag]) -> String? {
+        guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return text }
+        if phraseSupported(text) { return text }
+        flags.append(.init(kind: .ungroundedField, claim: "\(field): \(text)", detail: "removed — not supported by the transcript"))
+        return nil
+    }
+
+    /// Filter a list field (PMH, allergies, differential), dropping each entry the transcript
+    /// does not support.
+    private func filterGroundedList(_ items: [String], field: String, into flags: inout [VerificationFlag]) -> [String] {
+        items.filter { item in
+            if phraseSupported(item) { return true }
+            flags.append(.init(kind: .ungroundedField, claim: "\(field): \(item)", detail: "removed — not supported by the transcript"))
+            return false
+        }
+    }
+
+    /// Whether a short clinical label (CC/diagnosis/PMH/allergy/differential/disposition) is
+    /// supported by the transcript. Three gates, tightened after an adversarial pass found:
+    ///   - a 2-letter label ("PE", "MI") had NO content words and so passed unconditionally →
+    ///     require the whole phrase to appear as a clean word instead;
+    ///   - "ruled out STEMI" / "mother had a stroke" grounded the bare token → negation/attribution
+    ///     awareness via `groundedAffirmatively`;
+    ///   - a fabricated 2-word label rode a single incidental word at exactly 0.5 → strictly `> 0.5`.
+    private func phraseSupported(_ text: String) -> Bool {
+        let n = Self.normalize(text)
+        guard !n.isEmpty else { return true }
+        // 1) Whole phrase present, cleanly (not negated/attributed) → grounded. Also the ONLY way a
+        //    short/abbreviation label with no content words can ground.
+        if groundedAffirmatively(n, cues: Self.labelCues) { return true }
+        // 2) Fall back to content-word overlap for a paraphrased multi-word label, but require a
+        //    strict majority AND that at least one supporting word appears in a clean context.
+        let words = Self.contentWords(n)
+        guard !words.isEmpty else { return false } // no content words and phrase not present → not grounded
+        let transcriptWords = Self.contentWords(normalizedTranscript)
+        let supported = words.filter { transcriptWords.contains($0) }
+        guard Double(supported.count) / Double(words.count) > 0.5 else { return false }
+        return supported.contains { groundedAffirmatively($0, cues: Self.labelCues) }
+    }
+
+    /// The encounter explicitly stated the patient has no drug allergies — and did NOT also document
+    /// an allergy (so "no allergies listed... but she's allergic to sulfa" does not assert NKDA).
+    private func transcriptStatesNoAllergies() -> Bool {
+        let phrases = ["no known drug allergies", "no known allergies", "no drug allergies",
+                       "nkda", "no allergies", "denies allergies", "denies any allergies"]
+        guard phrases.contains(where: { normalizedTranscript.contains($0) }) else { return false }
+        let contradicts = ["allergic to", "allergy to", "allergies to", "reaction to", "allergic:"]
+        return !contradicts.contains { normalizedTranscript.contains($0) }
+    }
+
     /// Meaningful (non-stopword) word tokens for coarse narrative grounding.
     static func contentWords(_ normalizedText: String) -> Set<String> {
         let stop: Set<String> = [
@@ -238,12 +307,38 @@ public struct GroundingVerifier {
 
     // MARK: - Matching primitives
 
-    /// A phrase (drug/test name) appears in the transcript, whitespace/case-insensitive.
-    private func phraseGrounded(_ phrase: String) -> Bool {
+    /// A phrase is grounded only if it appears in the transcript AS A WHOLE WORD in at least one
+    /// place that is NOT immediately preceded by a negation / attribution / discontinuation cue.
+    /// This stops "ruled out STEMI", "mother had a stroke", "allergic to penicillin", and "stopping
+    /// his aspirin" from grounding the bare token. Heuristic (a fixed cue window, not a parser) —
+    /// it catches the common dangerous cases, not every phrasing.
+    private func groundedAffirmatively(_ phrase: String, cues: [String]) -> Bool {
         let n = Self.normalize(phrase)
         guard !n.isEmpty else { return false }
-        return normalizedTranscript.contains(n)
+        let hay = normalizedTranscript
+        var start = hay.startIndex
+        while let r = hay.range(of: n, range: start..<hay.endIndex) {
+            start = r.upperBound
+            let beforeOK = r.lowerBound == hay.startIndex || !hay[hay.index(before: r.lowerBound)].isLetter
+            let afterOK = r.upperBound == hay.endIndex || !hay[r.upperBound].isLetter
+            guard beforeOK, afterOK else { continue } // whole-word only ("iron" ≠ "environment")
+            let ctxStart = hay.index(r.lowerBound, offsetBy: -60, limitedBy: hay.startIndex) ?? hay.startIndex
+            let context = Self.tailAfterLastSeparator(String(hay[ctxStart..<r.lowerBound]))
+            if !cues.contains(where: { context.contains($0) }) { return true }
+        }
+        return false
     }
+
+    static let negationCues = ["no ", "not ", "n't ", "without ", "denies", "denied", "negative for",
+                               "ruled out", "rule out", "r/o ", "resolved", "never had", "free of", "absent"]
+    static let attributionCues = ["mother", "father", "sister", "brother", "parent", "grandmother",
+                                  "grandfather", "aunt", "uncle", "family history", "fh ", "fhx",
+                                  "cousin", "maternal", "paternal"]
+    static let discontinuationCues = ["stop", "discontinue", "held", "holding", "hold ", " off ",
+                                      "avoid", "not giving", "do not give", "allergic to", "allergy to",
+                                      "allergies to", "reaction to"]
+    static var labelCues: [String] { negationCues + attributionCues }
+    static var medicationCues: [String] { negationCues + discontinuationCues }
 
     /// A route word appears anywhere in the transcript (routes aren't tied to one position).
     private func routeGrounded(_ route: String) -> Bool {
