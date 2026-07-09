@@ -15,6 +15,10 @@ final class ShiftViewModel {
     private let context: ModelContext
     private let capture: CaptureController
     private let worker: GenerationWorker
+    private let engine: NoteEngine
+
+    /// On-device model download/load state (shows a banner on first run).
+    let modelHost = ModelHost.shared
 
     private(set) var encounters: [Encounter] = []
     var isRecording = false
@@ -38,20 +42,34 @@ final class ShiftViewModel {
         #endif
         self.capture = CaptureController(audioDirectory: audioDir, input: input)
 
-        let modelPath = Bundle.main.path(forResource: "Llama-3.2-3B-Instruct-4bit", ofType: nil) ?? ""
-        self.worker = GenerationWorker(
-            container: container,
-            engine: NoteEngineFactory.make(audioDirectory: audioDir, modelPath: modelPath)
-        )
+        let engine = NoteEngineFactory.make(audioDirectory: audioDir)
+        self.engine = engine
+        self.worker = GenerationWorker(container: container, engine: engine)
 
         reload()
         Task {
             _ = await worker.recoverAndDrain()
             reload()
             #if targetEnvironment(simulator)
+            modelHost.update(.ready)   // no download in the simulator (mock)
             await seedDemoIfEmpty()
+            #elseif canImport(MLXLLM)
+            // Start the model download/load early so the first note isn't blocked.
+            if let onDevice = engine as? OnDeviceNoteEngine { await onDevice.warmup() }
             #endif
         }
+    }
+
+    /// Delete an encounter (swipe-to-delete) and its audio file. Irreversible.
+    func delete(_ encounter: Encounter) {
+        if let rel = encounter.audioFileRelPath {
+            let url = URL.applicationSupportDirectory
+                .appending(path: "NotedCore/audio", directoryHint: .isDirectory)
+                .appending(path: rel)
+            try? FileManager.default.removeItem(at: url)
+        }
+        try? ShiftBoard.delete(encounter, in: context)
+        reload()
     }
 
     /// Simulator only: run one demo encounter through the pipeline on first launch so the board
@@ -156,12 +174,29 @@ struct ShiftListView: View {
                             NavigationLink(value: encounter.id) {
                                 EncounterRow(encounter: encounter)
                             }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    model.delete(encounter)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
                         }
                     }
                     .listStyle(.plain)
                     .safeAreaPadding(.bottom, 120)
                 }
                 recordControl
+            }
+            .safeAreaInset(edge: .top) {
+                if let banner = model.modelHost.banner {
+                    Text(banner)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 8)
+                        .background(.thinMaterial)
+                }
             }
             .navigationTitle("Shift")
             .navigationDestination(for: UUID.self) { id in

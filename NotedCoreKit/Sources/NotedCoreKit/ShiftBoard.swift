@@ -49,6 +49,13 @@ public enum ShiftBoard {
         encounter.phase == .noteDrafted || encounter.phase == .dischargeDrafted
     }
 
+    /// Delete an encounter (swipe-to-delete). Cascade-deletes its jobs; the app also removes the
+    /// audio file. Irreversible.
+    public static func delete(_ encounter: Encounter, in context: ModelContext) throws {
+        context.delete(encounter)
+        try context.save()
+    }
+
     /// Sign a drafted encounter — allowed in ANY order, independent of other encounters.
     /// Returns false if the encounter isn't in a signable phase.
     @discardableResult

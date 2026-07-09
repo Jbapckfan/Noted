@@ -33,19 +33,25 @@ public actor MLXNoteEngine: NoteEngine {
         case emptyGeneration
     }
 
-    private let modelPath: String                        // local bundled 4-bit model directory
+    private let modelId: String                          // HuggingFace repo id OR a local model dir
     private let adapterPaths: [GenerationJobKind: String] // per-stage LoRA adapters (PR5/PR9)
     private let minFreeBytesToLoad: UInt64
     private var container: ModelContainer?
 
     public init(
-        modelPath: String,
+        modelId: String,
         adapterPaths: [GenerationJobKind: String] = [:],
         minFreeMBToLoad: UInt64 = 900
     ) {
-        self.modelPath = modelPath
+        self.modelId = modelId
         self.adapterPaths = adapterPaths
         self.minFreeBytesToLoad = minFreeMBToLoad * 1_000_000
+    }
+
+    /// Kick the model load/download early (call on launch) so the first note isn't blocked on the
+    /// ~1.8 GB first-run download. Progress is reported via ModelHost.
+    public func warmup() async {
+        try? await ensureLoaded()
     }
 
     // MARK: NoteEngine
@@ -80,14 +86,27 @@ public actor MLXNoteEngine: NoteEngine {
         #if !targetEnvironment(simulator)
         let free = os_proc_available_memory()
         if free > 0 && UInt64(free) < minFreeBytesToLoad {
-            throw EngineError.insufficientMemory(freeMB: UInt64(free) / 1_000_000)
+            let mb = UInt64(free) / 1_000_000
+            await MainActor.run { ModelHost.shared.update(.failed("low memory (\(mb) MB free)")) }
+            throw EngineError.insufficientMemory(freeMB: mb)
         }
         MLX.GPU.set(cacheLimit: 256 * 1024 * 1024) // bound Metal cache; Metal is unavailable in sim
         #endif
 
-        container = try await LLMModelFactory.shared.loadContainer(
-            configuration: MLXLMCommon.ModelConfiguration(id: modelPath)
-        )
+        await MainActor.run { ModelHost.shared.update(.downloading(0)) }
+        do {
+            // ModelConfiguration(id:) accepts a HuggingFace repo id — first run downloads (~1.8 GB)
+            // and caches it; later runs load from cache. Progress drives the UI banner.
+            container = try await LLMModelFactory.shared.loadContainer(
+                configuration: MLXLMCommon.ModelConfiguration(id: modelId)
+            ) { progress in
+                Task { @MainActor in ModelHost.shared.update(.downloading(progress.fractionCompleted)) }
+            }
+            await MainActor.run { ModelHost.shared.update(.ready) }
+        } catch {
+            await MainActor.run { ModelHost.shared.update(.failed(error.localizedDescription)) }
+            throw error
+        }
         // LoRA fusion per stage is wired in PR5/PR9; base model runs the constrained schema until then.
     }
 

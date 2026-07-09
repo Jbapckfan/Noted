@@ -41,7 +41,7 @@ public struct MockNoteEngine: NoteEngine {
 
         case .extract:
             out.extractionJSON = """
-            {"chief_complaint":"Chest pain","hpi":"Patient reports two hours of substernal chest \
+            {"chief_complaint":"SIMULATOR DEMO (placeholder, not a real note) — Chest pain","hpi":"Patient reports two hours of substernal chest \
             pressure radiating to the left arm, with mild shortness of breath and diaphoresis.",\
             "review_of_systems":"Positive for chest pain, shortness of breath, and diaphoresis.",\
             "past_medical_history":["hypertension","high cholesterol"],"allergies":[],\

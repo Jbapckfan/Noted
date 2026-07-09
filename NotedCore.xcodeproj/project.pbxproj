@@ -3,18 +3,18 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 110;
 	objects = {
 
 /* Begin PBXBuildFile section */
-		FE03FE03FE03FE03FE03FE03 /* NotedCoreKit in Frameworks */ = {isa = PBXBuildFile; productRef = FE02FE02FE02FE02FE02FE02 /* NotedCoreKit */; };
-		FE13FE13FE13FE13FE13FE13 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = FE11FE11FE11FE11FE11FE11 /* MLXLLM */; };
-		FE14FE14FE14FE14FE14FE14 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = FE12FE12FE12FE12FE12FE12 /* MLXLMCommon */; };
 		D0FE6AE32E1F6F0B0019CD1F /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = D0FE6AE22E1F6F0B0019CD1F /* MLX */; };
 		D0FE6AE52E1F6F0B0019CD1F /* MLXFFT in Frameworks */ = {isa = PBXBuildFile; productRef = D0FE6AE42E1F6F0B0019CD1F /* MLXFFT */; };
 		D0FE6AE72E1F6F0B0019CD1F /* MLXFast in Frameworks */ = {isa = PBXBuildFile; productRef = D0FE6AE62E1F6F0B0019CD1F /* MLXFast */; };
 		D0FE6AE92E1F6F0B0019CD1F /* MLXLinalg in Frameworks */ = {isa = PBXBuildFile; productRef = D0FE6AE82E1F6F0B0019CD1F /* MLXLinalg */; };
 		D0FE6AEB2E1F6F0B0019CD1F /* MLXNN in Frameworks */ = {isa = PBXBuildFile; productRef = D0FE6AEA2E1F6F0B0019CD1F /* MLXNN */; };
+		FE03FE03FE03FE03FE03FE03 /* NotedCoreKit in Frameworks */ = {isa = PBXBuildFile; productRef = FE02FE02FE02FE02FE02FE02 /* NotedCoreKit */; };
+		FE13FE13FE13FE13FE13FE13 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = FE11FE11FE11FE11FE11FE11 /* MLXLLM */; };
+		FE14FE14FE14FE14FE14FE14 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = FE12FE12FE12FE12FE12FE12 /* MLXLMCommon */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -106,7 +106,6 @@
 /* Begin PBXFrameworksBuildPhase section */
 		D037A5AA2E1ED2A10015A53E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 				FE03FE03FE03FE03FE03FE03 /* NotedCoreKit in Frameworks */,
 				D0FE6AE32E1F6F0B0019CD1F /* MLX in Frameworks */,
@@ -117,42 +116,31 @@
 				D0FE6AEB2E1F6F0B0019CD1F /* MLXNN in Frameworks */,
 				D0FE6AE52E1F6F0B0019CD1F /* MLXFFT in Frameworks */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		D037A5BC2E1ED2A30015A53E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		D037A5C62E1ED2A30015A53E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		D0D9F4762E7BDF8600958BCA /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		D0D9F4822E7BDF8600958BCA /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		D0D9F48C2E7BDF8600958BCA /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
@@ -196,8 +184,6 @@
 			);
 			buildRules = (
 			);
-			dependencies = (
-			);
 			fileSystemSynchronizedGroups = (
 				D037A5AF2E1ED2A10015A53E /* NotedCore */,
 			);
@@ -233,8 +219,6 @@
 				D037A5C22E1ED2A30015A53E /* NotedCoreTests */,
 			);
 			name = NotedCoreTests;
-			packageProductDependencies = (
-			);
 			productName = NotedCoreTests;
 			productReference = D037A5BF2E1ED2A30015A53E /* NotedCoreTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -256,8 +240,6 @@
 				D037A5CC2E1ED2A30015A53E /* NotedCoreUITests */,
 			);
 			name = NotedCoreUITests;
-			packageProductDependencies = (
-			);
 			productName = NotedCoreUITests;
 			productReference = D037A5C92E1ED2A30015A53E /* NotedCoreUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
@@ -272,14 +254,10 @@
 			);
 			buildRules = (
 			);
-			dependencies = (
-			);
 			fileSystemSynchronizedGroups = (
 				D0D9F47A2E7BDF8600958BCA /* NotedWatch Watch App */,
 			);
 			name = "NotedWatch Watch App";
-			packageProductDependencies = (
-			);
 			productName = "NotedWatch Watch App";
 			productReference = D0D9F4792E7BDF8600958BCA /* NotedWatch Watch App.app */;
 			productType = "com.apple.product-type.application";
@@ -301,8 +279,6 @@
 				D0D9F4882E7BDF8600958BCA /* NotedWatch Watch AppTests */,
 			);
 			name = "NotedWatch Watch AppTests";
-			packageProductDependencies = (
-			);
 			productName = "NotedWatch Watch AppTests";
 			productReference = D0D9F4852E7BDF8600958BCA /* NotedWatch Watch AppTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -324,8 +300,6 @@
 				D0D9F4922E7BDF8600958BCA /* NotedWatch Watch AppUITests */,
 			);
 			name = "NotedWatch Watch AppUITests";
-			packageProductDependencies = (
-			);
 			productName = "NotedWatch Watch AppUITests";
 			productReference = D0D9F48F2E7BDF8600958BCA /* NotedWatch Watch AppUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
@@ -378,7 +352,7 @@
 				D0FE6AE12E1F6F0B0019CD1F /* XCRemoteSwiftPackageReference "mlx-swift" */,
 				FE01FE01FE01FE01FE01FE01 /* XCLocalSwiftPackageReference "NotedCoreKit" */,
 			);
-			preferredProjectObjectVersion = 77;
+			preferredProjectObjectVersion = 110;
 			productRefGroup = D037A5AE2E1ED2A10015A53E /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -396,90 +370,66 @@
 /* Begin PBXResourcesBuildPhase section */
 		D037A5AB2E1ED2A10015A53E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		D037A5BD2E1ED2A30015A53E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		D037A5C72E1ED2A30015A53E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		D0D9F4772E7BDF8600958BCA /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		D0D9F4832E7BDF8600958BCA /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		D0D9F48D2E7BDF8600958BCA /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		D037A5A92E1ED2A10015A53E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		D037A5BB2E1ED2A30015A53E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		D037A5C52E1ED2A30015A53E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		D0D9F4752E7BDF8600958BCA /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		D0D9F4812E7BDF8600958BCA /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		D0D9F48B2E7BDF8600958BCA /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
@@ -507,7 +457,7 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		D037A5D12E1ED2A30015A53E /* Debug */ = {
+		D037A5D12E1ED2A30015A53E /* Debug configuration for PBXProject "NotedCore" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -571,7 +521,7 @@
 			};
 			name = Debug;
 		};
-		D037A5D22E1ED2A30015A53E /* Release */ = {
+		D037A5D22E1ED2A30015A53E /* Release configuration for PBXProject "NotedCore" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -628,7 +578,7 @@
 			};
 			name = Release;
 		};
-		D037A5D42E1ED2A30015A53E /* Debug */ = {
+		D037A5D42E1ED2A30015A53E /* Debug configuration for PBXNativeTarget "NotedCore" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -661,7 +611,7 @@
 			};
 			name = Debug;
 		};
-		D037A5D52E1ED2A30015A53E /* Release */ = {
+		D037A5D52E1ED2A30015A53E /* Release configuration for PBXNativeTarget "NotedCore" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -694,7 +644,7 @@
 			};
 			name = Release;
 		};
-		D037A5D72E1ED2A30015A53E /* Debug */ = {
+		D037A5D72E1ED2A30015A53E /* Debug configuration for PBXNativeTarget "NotedCoreTests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -714,7 +664,7 @@
 			};
 			name = Debug;
 		};
-		D037A5D82E1ED2A30015A53E /* Release */ = {
+		D037A5D82E1ED2A30015A53E /* Release configuration for PBXNativeTarget "NotedCoreTests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -734,15 +684,15 @@
 			};
 			name = Release;
 		};
-		D037A5DA2E1ED2A30015A53E /* Debug */ = {
+		D037A5DA2E1ED2A30015A53E /* Debug configuration for PBXNativeTarget "NotedCoreUITests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 529ZZJHQR4;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jamesalford.NotedCoreUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -753,15 +703,15 @@
 			};
 			name = Debug;
 		};
-		D037A5DB2E1ED2A30015A53E /* Release */ = {
+		D037A5DB2E1ED2A30015A53E /* Release configuration for PBXNativeTarget "NotedCoreUITests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 529ZZJHQR4;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jamesalford.NotedCoreUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -772,7 +722,7 @@
 			};
 			name = Release;
 		};
-		D0D9F49B2E7BDF8600958BCA /* Debug */ = {
+		D0D9F49B2E7BDF8600958BCA /* Debug configuration for PBXNativeTarget "NotedWatch Watch App" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -805,7 +755,7 @@
 			};
 			name = Debug;
 		};
-		D0D9F49C2E7BDF8600958BCA /* Release */ = {
+		D0D9F49C2E7BDF8600958BCA /* Release configuration for PBXNativeTarget "NotedWatch Watch App" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -838,7 +788,7 @@
 			};
 			name = Release;
 		};
-		D0D9F49F2E7BDF8600958BCA /* Debug */ = {
+		D0D9F49F2E7BDF8600958BCA /* Debug configuration for PBXNativeTarget "NotedWatch Watch AppTests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -861,7 +811,7 @@
 			};
 			name = Debug;
 		};
-		D0D9F4A02E7BDF8600958BCA /* Release */ = {
+		D0D9F4A02E7BDF8600958BCA /* Release configuration for PBXNativeTarget "NotedWatch Watch AppTests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -884,7 +834,7 @@
 			};
 			name = Release;
 		};
-		D0D9F4A22E7BDF8600958BCA /* Debug */ = {
+		D0D9F4A22E7BDF8600958BCA /* Debug configuration for PBXNativeTarget "NotedWatch Watch AppUITests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -906,7 +856,7 @@
 			};
 			name = Debug;
 		};
-		D0D9F4A32E7BDF8600958BCA /* Release */ = {
+		D0D9F4A32E7BDF8600958BCA /* Release configuration for PBXNativeTarget "NotedWatch Watch AppUITests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -934,86 +884,60 @@
 		D037A5A82E1ED2A10015A53E /* Build configuration list for PBXProject "NotedCore" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				D037A5D12E1ED2A30015A53E /* Debug */,
-				D037A5D22E1ED2A30015A53E /* Release */,
+				D037A5D12E1ED2A30015A53E /* Debug configuration for PBXProject "NotedCore" */,
+				D037A5D22E1ED2A30015A53E /* Release configuration for PBXProject "NotedCore" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		D037A5D32E1ED2A30015A53E /* Build configuration list for PBXNativeTarget "NotedCore" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				D037A5D42E1ED2A30015A53E /* Debug */,
-				D037A5D52E1ED2A30015A53E /* Release */,
+				D037A5D42E1ED2A30015A53E /* Debug configuration for PBXNativeTarget "NotedCore" */,
+				D037A5D52E1ED2A30015A53E /* Release configuration for PBXNativeTarget "NotedCore" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		D037A5D62E1ED2A30015A53E /* Build configuration list for PBXNativeTarget "NotedCoreTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				D037A5D72E1ED2A30015A53E /* Debug */,
-				D037A5D82E1ED2A30015A53E /* Release */,
+				D037A5D72E1ED2A30015A53E /* Debug configuration for PBXNativeTarget "NotedCoreTests" */,
+				D037A5D82E1ED2A30015A53E /* Release configuration for PBXNativeTarget "NotedCoreTests" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		D037A5D92E1ED2A30015A53E /* Build configuration list for PBXNativeTarget "NotedCoreUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				D037A5DA2E1ED2A30015A53E /* Debug */,
-				D037A5DB2E1ED2A30015A53E /* Release */,
+				D037A5DA2E1ED2A30015A53E /* Debug configuration for PBXNativeTarget "NotedCoreUITests" */,
+				D037A5DB2E1ED2A30015A53E /* Release configuration for PBXNativeTarget "NotedCoreUITests" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		D0D9F49A2E7BDF8600958BCA /* Build configuration list for PBXNativeTarget "NotedWatch Watch App" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				D0D9F49B2E7BDF8600958BCA /* Debug */,
-				D0D9F49C2E7BDF8600958BCA /* Release */,
+				D0D9F49B2E7BDF8600958BCA /* Debug configuration for PBXNativeTarget "NotedWatch Watch App" */,
+				D0D9F49C2E7BDF8600958BCA /* Release configuration for PBXNativeTarget "NotedWatch Watch App" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		D0D9F49E2E7BDF8600958BCA /* Build configuration list for PBXNativeTarget "NotedWatch Watch AppTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				D0D9F49F2E7BDF8600958BCA /* Debug */,
-				D0D9F4A02E7BDF8600958BCA /* Release */,
+				D0D9F49F2E7BDF8600958BCA /* Debug configuration for PBXNativeTarget "NotedWatch Watch AppTests" */,
+				D0D9F4A02E7BDF8600958BCA /* Release configuration for PBXNativeTarget "NotedWatch Watch AppTests" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		D0D9F4A12E7BDF8600958BCA /* Build configuration list for PBXNativeTarget "NotedWatch Watch AppUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				D0D9F4A22E7BDF8600958BCA /* Debug */,
-				D0D9F4A32E7BDF8600958BCA /* Release */,
+				D0D9F4A22E7BDF8600958BCA /* Debug configuration for PBXNativeTarget "NotedWatch Watch AppUITests" */,
+				D0D9F4A32E7BDF8600958BCA /* Release configuration for PBXNativeTarget "NotedWatch Watch AppUITests" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		FE10FE10FE10FE10FE10FE10 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ml-explore/mlx-swift-examples";
-			requirement = {
-				kind = revision;
-				revision = b0717631e37a7940b292eec11255d60029ed7a4d;
-			};
-		};
-		D0FE6AE12E1F6F0B0019CD1F /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ml-explore/mlx-swift";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.25.5;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCLocalSwiftPackageReference section */
 		FE01FE01FE01FE01FE01FE01 /* XCLocalSwiftPackageReference "NotedCoreKit" */ = {
@@ -1022,21 +946,26 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		D0FE6AE12E1F6F0B0019CD1F /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.25.5;
+			};
+		};
+		FE10FE10FE10FE10FE10FE10 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift-examples";
+			requirement = {
+				kind = revision;
+				revision = b0717631e37a7940b292eec11255d60029ed7a4d;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
-		FE02FE02FE02FE02FE02FE02 /* NotedCoreKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = NotedCoreKit;
-		};
-		FE11FE11FE11FE11FE11FE11 /* MLXLLM */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = FE10FE10FE10FE10FE10FE10 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
-			productName = MLXLLM;
-		};
-		FE12FE12FE12FE12FE12FE12 /* MLXLMCommon */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = FE10FE10FE10FE10FE10FE10 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
-			productName = MLXLMCommon;
-		};
 		D0FE6AE22E1F6F0B0019CD1F /* MLX */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = D0FE6AE12E1F6F0B0019CD1F /* XCRemoteSwiftPackageReference "mlx-swift" */;
@@ -1061,6 +990,20 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D0FE6AE12E1F6F0B0019CD1F /* XCRemoteSwiftPackageReference "mlx-swift" */;
 			productName = MLXNN;
+		};
+		FE02FE02FE02FE02FE02FE02 /* NotedCoreKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotedCoreKit;
+		};
+		FE11FE11FE11FE11FE11FE11 /* MLXLLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FE10FE10FE10FE10FE10FE10 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
+			productName = MLXLLM;
+		};
+		FE12FE12FE12FE12FE12FE12 /* MLXLMCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FE10FE10FE10FE10FE10FE10 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
+			productName = MLXLMCommon;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

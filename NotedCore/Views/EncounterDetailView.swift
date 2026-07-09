@@ -43,9 +43,25 @@ struct EncounterDetailView: View {
                 .font(.body.monospaced())
             }
 
-            if encounter.dischargeClinicianText != nil || encounter.phase == .dischargeDrafted {
-                Section("Discharge") {
-                    Text(encounter.dischargeClinicianText ?? "")
+            if encounter.dischargeClinicianText != nil || encounter.dischargePatientText != nil || encounter.phase == .dischargeDrafted {
+                Section("Discharge — clinician") {
+                    TextEditor(text: Binding(
+                        get: { encounter.dischargeClinicianText ?? "" },
+                        set: { encounter.dischargeClinicianText = $0; encounter.updatedAt = Date() }
+                    ))
+                    .frame(minHeight: 140)
+                    .font(.body.monospaced())
+                }
+                Section {
+                    TextEditor(text: Binding(
+                        get: { encounter.dischargePatientText ?? "" },
+                        set: { encounter.dischargePatientText = $0; encounter.updatedAt = Date() }
+                    ))
+                    .frame(minHeight: 140)
+                } header: {
+                    Text("Patient discharge instructions — customizable")
+                } footer: {
+                    Text("Edit freely; the patient version is yours to tailor.")
                 }
             }
 
