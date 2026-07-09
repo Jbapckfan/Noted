@@ -3,4 +3,4 @@
 #   git config core.hooksPath .githooks
 # Blocks commits that introduce credentials. (Offline-guard runs in CI/pre-push, not here,
 # so mid-refactor commits during the online-path excision aren't blocked.)
-exec sh "$(git rev-parse --show-toplevel)/scripts/check-secrets.sh" --staged
+exec sh "$(git rev-parse --show-toplevel)/Scripts/check-secrets.sh" --staged
