@@ -7,6 +7,7 @@ public struct VerificationFlag: Equatable, Codable, Sendable {
         case ungroundedDose         // a dose value not present near the drug
         case ungroundedRoute        // a route not present in the transcript
         case ungroundedLabValue     // a lab/result value not present near its test name
+        case ungroundedVitalValue   // a vital sign value not present near its name
         case fabricatedPrecaution   // a return precaution outside the allowed library
     }
     public let kind: Kind
@@ -82,6 +83,15 @@ public struct GroundingVerifier {
             if !valueGroundedNear(name: lab.test, numericTokens: tokens) {
                 flags.append(.init(kind: .ungroundedLabValue, claim: "\(lab.test) \(lab.value)",
                                    detail: "value \(lab.value) not found near \(lab.test) in the transcript"))
+            }
+        }
+
+        for vital in facts.vitals {
+            let tokens = Self.numericTokens(in: vital.value)
+            guard !tokens.isEmpty else { continue }
+            if !valueGroundedNear(name: vital.name, numericTokens: tokens) {
+                flags.append(.init(kind: .ungroundedVitalValue, claim: "\(vital.name) \(vital.value)",
+                                   detail: "vital \(vital.value) not found near \(vital.name) in the transcript"))
             }
         }
 

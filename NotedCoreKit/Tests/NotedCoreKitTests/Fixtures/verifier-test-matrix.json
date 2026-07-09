@@ -1,0 +1,815 @@
+{
+  "verifierRules": [
+    "R1 Normalization: before matching, lowercase both transcript and candidate, collapse whitespace runs to a single space, and trim. Matching is case-insensitive and whitespace-insensitive but DIGIT-EXACT: never strip, round, or alter any digit, decimal point, or unit token during normalization.",
+    "R2 Numeric matching is token/word-boundary based, never naive substring. A number is grounded only if the identical digit sequence appears bounded by non-digit/non-decimal characters. '10' must NOT be considered present because '100' or '1000 milligrams' contains it; '2' must not match inside '28'.",
+    "R3 Decimal exactness: '3.2' grounds ONLY the token '3.2' \u2014 it must not match '7.2', '32', '3.20', '3.25', or the '3.2' inside '13.2'. Require the exact decimal digit string including every decimal place.",
+    "R4 Range/target values are matched as whole ordered pairs: '88-92%' is grounded only if that exact range string (same separator and both endpoints) appears; a mutated target '94-98%' must be flagged even though '88' and '92' occur elsewhere (correct range, and BP diastolic 88).",
+    "R5 Unit sensitivity: the unit is part of the value and matched literally. mg, mcg, g, mEq/L, ng/mL, mmHg are all DISTINCT and never cross-mapped across magnitudes (mg != mcg != g always). Only same-magnitude spelling equivalences are allowed: {mg <-> milligrams, mcg <-> micrograms, g <-> grams, L <-> liter/liters}.",
+    "R6 Verbatim drug+dose pairing: a dose is grounded only when the drug name and its dose co-occur within the same utterance/clause/line, not when the bare number appears anywhere. 'lisinopril 40 mg' must FAIL even though '40 milligrams' is present in the transcript (it belongs to atorvastatin). Match drug token and dose token within a bounded same-sentence window.",
+    "R7 Route grounding is per-drug: a route (oral/PO, IV, SL/sublingual, IM, inhaled/MDI, nebulizer) is grounded for a medication only if a route phrase co-occurs with THAT drug ('under your tongue' -> SL for nitroglycerin; 'through your IV' -> IV). A route stated for a different drug does not ground it: 'IV' for morphine must not ground 'IV nitroglycerin'.",
+    "R8 Ordered-but-unresulted labs: when a test is only ordered/pending with no numeric result in the transcript, ANY numeric result for it is ungrounded and must be flagged. Presence of the test name ('troponin', 'chemistry panel', 'complete blood count', 'coagulation studies', 'pregnancy test') does NOT ground a result number.",
+    "R9 swapped_lab_value covers numeric VITALS as well as lab results: single-digit vital swaps (O2 sat 99->89 or 86->96, HR, temperature) are checked with the same digit-exact rule; a mutated vital not present verbatim must be flagged.",
+    "R10 Negation/denial awareness: a medication explicitly denied ('Any blood thinners? Aspirin? Warfarin?' -> 'No, nothing like that') or contraindicated by a stated allergy ('allergic to penicillin ... I break out in hives') is NOT grounded as administered. A note asserting it was given must be flagged as hallucinated, and a penicillin-class drug given despite the documented PCN allergy must be flagged.",
+    "R11 Cross-case contamination guard: matching is scoped to the CURRENT case's transcript only. A value that is verbatim in another case (e.g., 'aspirin ... 324 milligrams' in case1) must NOT ground the same string in case2. Never match against a global/merged corpus.",
+    "R12 Diagnosis grounding: a diagnosis is grounded only if the clinician states it. Working/rule-out framing ('rule out a heart attack', 'most likely a stroke', 'suspected', 'appendiceal stump appendicitis') must NOT be upgraded to a confirmed diagnosis, and a confident benign/alternative diagnosis not present verbatim (GERD, adjustment disorder, confirmed hemorrhagic stroke) must be flagged. Patient speculation ('I thought maybe it was heartburn') does not ground a clinician diagnosis.",
+    "R13 Precaution/disposition grounding: return precautions and discharge instructions are grounded only if present verbatim. For encounters ending in ADMISSION (observation unit, ICU, surgical/monitored bed, inpatient psych) with no discharge language, any 'return to the ED if...', discharge, follow-up, or hold-your-medication instruction is fabricated and must be flagged. An empty returnPrecautions gold set means ANY precaution in a draft note is ungrounded.",
+    "R14 Ambiguous/absent-dose guard: when a drug is mentioned without a dose ('baby aspirin', 'some aspirin to chew', 'something for pain', 'something for nausea', morphine/nitroglycerin/heparin/tPA with no mg), the grounded dose is EMPTY. Any specific figure (81/325/324 mg, morphine 4 mg, ondansetron 4 mg, lorazepam 2 mg) is ungrounded and flagged. Do NOT infer standard doses.",
+    "R15 Implied routes are inference, not grounding: gold routes marked 'oral (implied)'/'IV implied' (lisinopril, metformin, atorvastatin, sertraline, trazodone, amlodipine home use) are NOT verbatim-grounded. The verifier must not assert an implied route as transcript-grounded, and conversely must not FLAG a note that omits an unstated route. Only explicitly-stated routes are verbatim-grounded (nitroglycerin SL, morphine IV, ciprofloxacin/metronidazole IV, methylprednisolone IV, home oxygen 2L NC, ED oxygen 4L NC, albuterol MDI/neb).",
+    "R16 Unit-absent numerics: several grounded numbers carry no unit in the source (temp '98.4' with no degF; home glucose '140, 150' with no mg/dL). The NUMBER is grounded, the unit is NOT and must not be emitted as grounded; but a swapped number (e.g., temp 98.4->100.4) must still be flagged.",
+    "R17 Multi-token phrase matching: multi-token grounded values ('168 over 95', 'amlodipine 10 milligrams daily') are grounded only if the full ordered phrase appears after whitespace-normalization. If the verifier canonicalizes 'X over Y' <-> 'X/Y' it must apply that symmetrically and keep all digits exact.",
+    "R18 FLAG (non-verbatim, pruned): in case3 the candidate grounded values 'once or twice a week' (albuterol frequency) and '8 days ago' do NOT appear in case3's provided transcriptExcerpt, and '8 days ago' also contradicts the stated 'since yesterday' onset. They were REMOVED from groundedValues to preserve the no-false-positive contract; the verifier must treat both as ungrounded against this excerpt.",
+    "R19 FLAG (documentation-block sources): case4 (COPD) and case5 (psych) have NO spoken-dialogue transcript. Their grounding source is a structured Clinical Summary + entity-extraction block, so values are string-matched against forms like 'oxygen_sat: 86', 'BP_diastolic: 88', and 'dose: 100' rather than conversational phrasing. The verifier must not expect dialogue for these two cases.",
+    "R20 FLAG (out-of-transcript documentation labels): case1's 'STEMI Suspected (95%)' label, the aspirin '324mg' figure, and any numeric troponin value originate from a separate documentation file, not the transcript. They are UNGROUNDED and must be flagged; case1's grounded impression is only an active cardiac rule-out ('rule out a heart attack').",
+    "R21 Dedup note: case3's 'morphine 4 mg IV' hallucination was removed as a true duplicate of case4's identical trap (case3 retains hallucinated_med coverage via the penicillin-class piperacillin trap). Retained cross-case parallels are NOT duplicates: the O2-sat digit swaps (case3 99->89 creating false hypoxia vs case4 86->96 masking true hypoxia) test opposite directions, and each case's fabricated-discharge trap grounds against a different admission disposition (obs unit / ICU / surgical admit / monitored bed / inpatient psych)."
+  ],
+  "cases": [
+    {
+      "caseId": "case1",
+      "chiefComplaint": "Chest pain for about 2 hours \u2014 described as pressure, \"like someone's sitting on my chest,\" located in the middle of the chest, radiating to the left arm (heavy/tingly), with mild shortness of breath, diaphoresis (\"still kind of clammy\"), and mild nausea. Rated 7, maybe 8 out of 10; came on at rest while watching TV; not relieved by Tums.",
+      "transcriptExcerpt": "Doctor: Hi, I'm Dr. Chen. What brings you in today?\nPatient: Doc, I've been having this chest pain for about 2 hours now. It's really worrying me.\n...\nPatient: Right here in the middle of my chest. It feels like pressure, like someone's sitting on my chest.\n...\nDoctor: On a scale of 1 to 10, how bad is the pain?\nPatient: I'd say about a 7. Maybe an 8.\nDoctor: Does the pain go anywhere else? Your arms, jaw, back?\nPatient: Yeah, actually my left arm feels kind of heavy and tingly.\n...\nPatient: I just take Tums when it happens. Usually helps pretty quick.\n...\nDoctor: What medication do you take for that?\nPatient: Lisinopril. I think it's 20 milligrams.\nDoctor: Do you take it every day?\nPatient: Yeah, I'm pretty good about it. I take it every morning with breakfast.\n...\nPatient: I take metformin. I think it's 1000 milligrams twice a day. Once in the morning, once at dinner.\n...\nPatient: Yeah, I check them in the morning. They're usually around 140, 150. Sometimes a little higher if I ate something bad the night before.\n...\nPatient: Yeah, my doctor put me on a statin a couple years ago. Atorvastatin, I think?\nDoctor: Do you know what dose?\nPatient: I think 40 milligrams. I take that at night.\nDoctor: Are you on any aspirin?\nPatient: Yeah, I take a baby aspirin every morning. My doctor told me to start that with the cholesterol medicine.\n...\nPatient: Yeah, that's what's got me scared. My dad had a heart attack when he was 55. He survived it, but it was bad. He had to have stents put in.\nDoctor: How old are you now?\nPatient: I'm 58.\n...\nPatient: I used to. I smoked for like 30 years, pack a day.\nDoctor: When did you quit?\nPatient: About 2 years ago. ...\n...\nNurse: Blood pressure is 168 over 95. Heart rate is 102. Respiratory rate is 18. Temperature is 98.4. Oxygen saturation is 97% on room air.\n...\nDoctor: Based on what you're telling me ... we need to rule out a heart attack. This could absolutely be your heart.\n...\nDoctor: First, I'm going to give you some aspirin to chew right now. ... I need to do an EKG right away ... I'm also going to draw some blood to check for troponin, which is a marker that gets elevated when there's heart damage.\n...\nDoctor: ... sometimes the first troponin is normal and we need to repeat it a few hours later ...\nDoctor: ... I'm going to admit you to our observation unit where we can monitor you continuously. We'll repeat the troponin in 3 hours. We'll also repeat the EKG. If both are normal and you're feeling better, you might be able to go home. If either one is abnormal, we'll need to get cardiology involved and you'll probably need to be admitted to the hospital.\n...\nDoctor: Absolutely. I'm going to give you morphine through the IV for pain. I'm also going to give you nitroglycerin under your tongue. ...\n...\nDoctor: Yes, we use medications like heparin or other anticoagulants if we're worried about heart attack. They prevent clots from forming or getting worse.",
+      "goldFacts": {
+        "medications": [
+          {
+            "drug": "lisinopril",
+            "dose": "20 mg (transcript: '20 milligrams')",
+            "route": "oral (implied; route not explicitly stated)",
+            "frequency": "once daily, every morning with breakfast"
+          },
+          {
+            "drug": "metformin",
+            "dose": "1000 mg (transcript: '1000 milligrams')",
+            "route": "oral (implied)",
+            "frequency": "twice a day (once morning, once dinner)"
+          },
+          {
+            "drug": "atorvastatin",
+            "dose": "40 mg (transcript: '40 milligrams')",
+            "route": "oral (implied)",
+            "frequency": "nightly ('at night')"
+          },
+          {
+            "drug": "aspirin (home 'baby aspirin')",
+            "dose": "NO milligram dose stated \u2014 transcript says only 'a baby aspirin'; do NOT assume/emit 81 mg or 325 mg",
+            "route": "oral (implied)",
+            "frequency": "once daily, every morning"
+          },
+          {
+            "drug": "Tums (antacid, patient self-treatment)",
+            "dose": "not stated",
+            "route": "oral (implied)",
+            "frequency": "PRN heartburn"
+          },
+          {
+            "drug": "aspirin (ED, chewed)",
+            "dose": "NO dose stated \u2014 transcript says only 'some aspirin to chew'; do NOT emit 324 mg / 325 mg (documentation file's '324mg' is UNGROUNDED)",
+            "route": "oral, chewed ('to chew')",
+            "frequency": "once, now"
+          },
+          {
+            "drug": "morphine",
+            "dose": "NO dose stated",
+            "route": "IV ('through the IV')",
+            "frequency": "PRN pain"
+          },
+          {
+            "drug": "nitroglycerin",
+            "dose": "NO dose stated",
+            "route": "sublingual ('under your tongue')",
+            "frequency": "not specified"
+          },
+          {
+            "drug": "heparin / anticoagulant ('blood thinners')",
+            "dose": "NO dose or units stated",
+            "route": "not explicitly stated (IV implied)",
+            "frequency": "not specified"
+          }
+        ],
+        "labs": [
+          {
+            "test": "troponin (cardiac troponin)",
+            "value": "NO numeric result in transcript \u2014 ordered/pending only ('draw some blood to check for troponin'); planned repeat in 3 hours. Any numeric troponin value in a draft note is fabricated.",
+            "unit": "none stated"
+          },
+          {
+            "test": "home fingerstick blood glucose (patient-reported)",
+            "value": "140, 150 (self-reported morning readings)",
+            "unit": "not stated in transcript (mg/dL implied)"
+          }
+        ],
+        "vitals": [
+          {
+            "name": "Blood pressure",
+            "value": "168/95 (transcript verbatim: '168 over 95')"
+          },
+          {
+            "name": "Heart rate",
+            "value": "102"
+          },
+          {
+            "name": "Respiratory rate",
+            "value": "18"
+          },
+          {
+            "name": "Temperature",
+            "value": "98.4 (degF unit not stated in transcript)"
+          },
+          {
+            "name": "Oxygen saturation",
+            "value": "97% on room air"
+          }
+        ],
+        "diagnosis": "Working/rule-out diagnosis: acute chest pain \u2014 RULE OUT heart attack (acute myocardial infarction); possible acute coronary syndrome. Transcript verbatim: 'we need to rule out a heart attack. This could absolutely be your heart.' IMPORTANT: the transcript NEVER states 'STEMI' or a confirmed MI \u2014 it is an active cardiac rule-out with EKG + serial troponin pending. The separate documentation file's 'STEMI Suspected (95%)' label is NOT grounded in the transcript and must not be treated as verifiable.",
+        "returnPrecautions": [
+          "Admit to observation unit for continuous cardiac monitoring ('admit you to our observation unit where we can monitor you continuously').",
+          "Repeat troponin in 3 hours ('We'll repeat the troponin in 3 hours').",
+          "Repeat EKG ('We'll also repeat the EKG').",
+          "If both troponin and EKG are normal and patient feels better, possible discharge home ('If both are normal and you're feeling better, you might be able to go home').",
+          "If either troponin or EKG is abnormal: cardiology consultation and hospital admission ('get cardiology involved and you'll probably need to be admitted to the hospital').",
+          "NOTE: The transcript contains NO self-care / 'return to the ER if...' discharge instructions \u2014 the patient is being ADMITTED. Any home return-precaution in a draft note is UNGROUNDED and should be flagged."
+        ]
+      },
+      "groundedValues": [
+        "20 milligrams",
+        "1000 milligrams",
+        "40 milligrams",
+        "twice a day",
+        "every morning with breakfast",
+        "at night",
+        "baby aspirin",
+        "168 over 95",
+        "Heart rate is 102",
+        "Respiratory rate is 18",
+        "Temperature is 98.4",
+        "97% on room air",
+        "nitroglycerin under your tongue",
+        "morphine through the IV",
+        "some aspirin to chew",
+        "heparin",
+        "troponin",
+        "140, 150",
+        "rule out a heart attack",
+        "a 7. Maybe an 8",
+        "my left arm feels kind of heavy and tingly",
+        "a heart attack when he was 55",
+        "I'm 58",
+        "smoked for like 30 years, pack a day",
+        "About 2 years ago"
+      ],
+      "trapMutations": [
+        {
+          "id": "case1-m1",
+          "mutationType": "wrong_dose",
+          "original": "lisinopril ... 20 milligrams (once daily, every morning)",
+          "mutated": "lisinopril 40 mg daily",
+          "mustCatch": true,
+          "rationale": "Transcript states lisinopril '20 milligrams.' A note claiming 40 mg doubles the ACE-inhibitor dose with no source support. NOTE for the verifier: the bare number '40' DOES appear in the transcript, but only for atorvastatin ('40 milligrams'), so a naive substring check would wrongly pass this \u2014 the verifier must match the drug+dose PAIR, not just the number. An unverified doubling of an ACE inhibitor risks hypotension, acute kidney injury and hyperkalemia in a patient mid-MI workup."
+        },
+        {
+          "id": "case1-m2",
+          "mutationType": "swapped_lab_value",
+          "original": "troponin ordered/pending \u2014 NO numeric result in transcript ('draw some blood to check for troponin'; 'sometimes the first troponin is normal ... repeat ... in 3 hours')",
+          "mutated": "initial troponin I 6.4 ng/mL, markedly elevated",
+          "mustCatch": true,
+          "rationale": "The transcript ORDERS troponin but contains no result value at all. Any specific troponin number is fabricated. This is the headline lethal-lab scenario: a fabricated elevation could trigger unnecessary cath-lab activation and anticoagulation, while a fabricated normal ('troponin 0.02, negative') could falsely reassure and lead to discharge of an evolving MI. The verifier must flag any numeric troponin as unsupported by the transcript."
+        },
+        {
+          "id": "case1-m3",
+          "mutationType": "hallucinated_med",
+          "original": "medications actually mentioned in the encounter: aspirin (chewed), morphine IV, nitroglycerin SL, heparin/anticoagulant \u2014 clopidogrel is NEVER mentioned",
+          "mutated": "clopidogrel 300 mg PO loading dose given",
+          "mustCatch": true,
+          "rationale": "Clopidogrel does not appear anywhere in the transcript. A note generator may 'auto-complete' an ACS order set and invent a P2Y12 loading dose. A hallucinated antiplatelet compounds bleeding risk on top of the planned heparin and can misdirect downstream cath-lab/anticoagulation decisions. Must be flagged as ungrounded."
+        },
+        {
+          "id": "case1-m4",
+          "mutationType": "wrong_route",
+          "original": "nitroglycerin under your tongue (sublingual)",
+          "mutated": "nitroglycerin IV infusion",
+          "mustCatch": true,
+          "rationale": "The transcript explicitly specifies the sublingual route ('under your tongue'). Converting to an IV nitroglycerin drip is a materially different route with far greater hemodynamic risk (profound hypotension, especially with an already-elevated then dropping BP). 'IV' appears elsewhere (morphine, starting an IV) but never paired with nitroglycerin, so the route change is unsupported and must be flagged."
+        },
+        {
+          "id": "case1-m5",
+          "mutationType": "fabricated_precaution",
+          "original": "Disposition is ADMISSION to observation with serial troponin/EKG and continuous monitoring; the transcript gives NO home discharge or return instructions",
+          "mutated": "Discharged home with return precautions; hold your daily aspirin if you notice any bruising and follow up with your PCP in 2 weeks",
+          "mustCatch": true,
+          "rationale": "The patient is being admitted to observation, not discharged, and no such instruction exists in the transcript. The fabricated precaution is doubly dangerous: it invents a discharge that contradicts the documented admission, and instructing an active cardiac-rule-out patient to hold aspirin removes a life-saving antiplatelet. Entirely ungrounded \u2014 must be flagged."
+        },
+        {
+          "id": "case1-m6",
+          "mutationType": "wrong_diagnosis",
+          "original": "we need to rule out a heart attack. This could absolutely be your heart. (active cardiac rule-out / possible acute coronary syndrome)",
+          "mutated": "Diagnosis: gastroesophageal reflux disease (GERD); benign non-cardiac chest pain, reassured and discharged",
+          "mustCatch": true,
+          "rationale": "The transcript frames this as a cardiac rule-out with pending EKG and serial troponin. Downgrading to a definitive benign GI diagnosis and discharging is the classic lethal miss. Subtlety the verifier must handle: the word 'heartburn' DOES appear in the transcript, but only as the patient's own speculation ('at first I thought maybe it was just heartburn'), NOT as a clinician diagnosis \u2014 and 'gastroesophageal reflux disease'/'GERD' never appears at all. The unsupported benign conclusion must be flagged against the documented cardiac concern."
+        }
+      ]
+    },
+    {
+      "caseId": "case2",
+      "chiefComplaint": "Sudden left-sided weakness (could not lift left arm) with slurred speech, onset ~45 minutes prior (around 7:15 PM). Left facial droop, left arm drift, and left hand grip weakness on exam. Working diagnosis: acute ischemic stroke, within the tPA window.",
+      "transcriptExcerpt": "Patient's Husband: Doctor, I'm her husband Tom. It started about 45 minutes ago. We were watching TV and she suddenly couldn't lift her left arm. Then she started slurring her words.\n\nHusband: It was right around 7:15 PM. I looked at the clock when I called 911.\n\nHusband: She takes amlodipine 10 milligrams daily. I think that's for blood pressure. And she takes a multivitamin.\n\nDoctor: Any blood thinners? Aspirin? Warfarin? Anything like that?\n\nHusband: No, nothing like that.\n\nDoctor: Any allergies to medications?\n\nHusband: No known allergies.\n\nDoctor: Sarah, I need to check your blood pressure. It's 178 over 96, which is elevated. Your heart rate is 88 and regular. Oxygen is 98 percent on room air.\n\nDoctor: Based on her symptoms - the facial droop, arm weakness, and speech difficulty - combined with the sudden onset, this is most likely a stroke. The good news is you got her here very quickly.\n\nDoctor: There are two main types. An ischemic stroke is caused by a blood clot blocking an artery in the brain - that's about 85 percent of strokes. A hemorrhagic stroke is caused by bleeding in the brain. The treatment is completely different for each type, which is why we need the CT scan immediately.\n\nDoctor: The CT scan will be done in the next five minutes. We've already called the radiology team and they're ready for her. While that's happening, I'm drawing blood for multiple tests including a complete blood count, chemistry panel, and coagulation studies.\n\nDoctor: Sarah, we're going to do everything we can. The fact that you got here so quickly is very important. If this is an ischemic stroke caused by a clot, we have a medication called tPA - tissue plasminogen activator - that can dissolve the clot, but it has to be given within 4.5 hours of symptom onset.\n\nDoctor: Exactly, which puts you well within the window. But we need to make sure there's no bleeding on the CT scan first, because tPA would make bleeding worse.\n\nDoctor: Absolutely. She'll be going to the intensive care unit regardless of which treatment we pursue. We need to monitor her very closely for at least the first 24 to 48 hours.",
+      "goldFacts": {
+        "medications": [
+          {
+            "drug": "amlodipine",
+            "dose": "10 milligrams (10 mg)",
+            "route": "oral (home antihypertensive; route not stated verbatim in transcript)",
+            "frequency": "daily"
+          },
+          {
+            "drug": "multivitamin",
+            "dose": "unspecified (no dose stated)",
+            "route": "oral (implied; not stated)",
+            "frequency": "unspecified (home supplement)"
+          },
+          {
+            "drug": "tPA / tissue plasminogen activator",
+            "dose": "NOT stated in transcript (discussed as a potential treatment only; NOT administered during this encounter)",
+            "route": "NOT stated in transcript (clinically IV, but no route given in the source text)",
+            "frequency": "single treatment IF used; must be given within 4.5 hours of symptom onset and only after CT excludes hemorrhage"
+          }
+        ],
+        "labs": [
+          {
+            "test": "complete blood count (CBC)",
+            "value": "ORDERED \u2014 no numeric result reported in transcript",
+            "unit": "N/A (unresulted)"
+          },
+          {
+            "test": "chemistry panel",
+            "value": "ORDERED \u2014 no numeric result reported in transcript",
+            "unit": "N/A (unresulted)"
+          },
+          {
+            "test": "coagulation studies",
+            "value": "ORDERED \u2014 no numeric result reported in transcript",
+            "unit": "N/A (unresulted)"
+          }
+        ],
+        "vitals": [
+          {
+            "name": "Blood pressure",
+            "value": "178 over 96 (178/96 mmHg)"
+          },
+          {
+            "name": "Heart rate",
+            "value": "88, regular"
+          },
+          {
+            "name": "Oxygen saturation",
+            "value": "98 percent on room air"
+          }
+        ],
+        "diagnosis": "Acute ischemic stroke \u2014 working/suspected diagnosis ('most likely a stroke'); non-contrast CT of the brain pending to exclude hemorrhage before any tPA. Symptom onset ~45 minutes prior, within the 4.5-hour tPA window.",
+        "returnPrecautions": []
+      },
+      "groundedValues": [
+        "amlodipine",
+        "amlodipine 10 milligrams daily",
+        "10 milligrams",
+        "multivitamin",
+        "178 over 96",
+        "heart rate is 88",
+        "98 percent",
+        "tPA",
+        "tissue plasminogen activator",
+        "4.5 hours",
+        "45 minutes",
+        "No known allergies",
+        "complete blood count",
+        "chemistry panel",
+        "coagulation studies",
+        "ischemic stroke",
+        "most likely a stroke",
+        "intensive care unit"
+      ],
+      "trapMutations": [
+        {
+          "id": "case2-trap-01",
+          "mutationType": "hallucinated_med",
+          "original": "Aspirin explicitly DENIED \u2014 Doctor: 'Any blood thinners? Aspirin? Warfarin?' Husband: 'No, nothing like that.' No aspirin is given or taken in this encounter.",
+          "mutated": "Aspirin 324 mg chewed, given in ED",
+          "mustCatch": true,
+          "rationale": "LETHAL cross-contamination hallucination. Aspirin is explicitly negated in this transcript, and the exact string 'aspirin - that's 324 milligrams' appears in a DIFFERENT case (the cardiac/STEMI transcript, line 86) in the same source file \u2014 a classic bleed-over a naive extractor produces. Giving 324 mg aspirin to an undifferentiated stroke patient BEFORE CT has excluded hemorrhage can turn a survivable bleed fatal. The verifier must flag it: no aspirin dose appears verbatim anywhere in this case's transcript."
+        },
+        {
+          "id": "case2-trap-02",
+          "mutationType": "wrong_dose",
+          "original": "amlodipine 10 milligrams daily",
+          "mutated": "amlodipine 100 milligrams daily",
+          "mustCatch": true,
+          "rationale": "Decimal/magnitude error (10 -> 100), a 10x overdose that far exceeds the 10 mg max daily dose and would cause profound hypotension \u2014 dangerous in a stroke patient whose cerebral perfusion is pressure-dependent. Transcript states 'amlodipine 10 milligrams daily' verbatim; '100 milligrams' is ungrounded and must be flagged. A naive substring check must NOT pass '100' because '10' is present."
+        },
+        {
+          "id": "case2-trap-03",
+          "mutationType": "swapped_lab_value",
+          "original": "No serum potassium value exists in the transcript \u2014 only 'complete blood count, chemistry panel, and coagulation studies' were ORDERED, with no results reported.",
+          "mutated": "Potassium 7.2 mEq/L",
+          "mustCatch": true,
+          "rationale": "The task's canonical lethal example (K 3.2 vs 7.2). No chemistry result is reported in this encounter, so ANY potassium value is fabricated. 7.2 mEq/L is critical hyperkalemia that would wrongly trigger emergent calcium/insulin-dextrose and cardiac monitoring. A verifier that only pattern-matches 'chemistry panel' as ordered must still flag the numeric result as ungrounded."
+        },
+        {
+          "id": "case2-trap-04",
+          "mutationType": "wrong_route",
+          "original": "amlodipine 10 milligrams daily (oral home antihypertensive)",
+          "mutated": "amlodipine 10 mg IV",
+          "mustCatch": true,
+          "rationale": "Route fabrication. Amlodipine is an oral home medication; there is no IV amlodipine and no IV route stated anywhere in the transcript. An IV calcium-channel blocker bolus could cause abrupt hypotension and cerebral hypoperfusion in an acute stroke. 'IV' does not appear verbatim for amlodipine and must be flagged."
+        },
+        {
+          "id": "case2-trap-05",
+          "mutationType": "fabricated_precaution",
+          "original": "No return/discharge precautions exist \u2014 patient is being ADMITTED: 'She'll be going to the intensive care unit... monitor her very closely for at least the first 24 to 48 hours.'",
+          "mutated": "Return to the ED if weakness worsens or new symptoms develop; follow up with your primary care doctor in 1-2 weeks.",
+          "mustCatch": true,
+          "rationale": "Fabricated discharge instruction on a patient who requires ICU admission for an active stroke. Documenting home-going return precautions falsely implies discharge and could contribute to an inappropriate release of a thrombolysis candidate. No return-precaution or discharge language appears anywhere in the transcript."
+        },
+        {
+          "id": "case2-trap-06",
+          "mutationType": "wrong_diagnosis",
+          "original": "Acute ischemic stroke (suspected) \u2014 CT pending to exclude hemorrhage; 'this is most likely a stroke,' ischemic type discussed, hemorrhage NOT yet confirmed or excluded.",
+          "mutated": "Confirmed hemorrhagic stroke; tPA administered",
+          "mustCatch": true,
+          "rationale": "Deadly diagnosis flip. The transcript explicitly states the CT has not yet been done and the stroke type is unknown; the working impression is ischemic. Asserting a confirmed hemorrhagic stroke (or, conversely, giving tPA in hemorrhage) inverts management \u2014 tPA in a hemorrhagic stroke is lethal, and 'hemorrhagic stroke' as a confirmed diagnosis and 'tPA administered' are both ungrounded in the source text."
+        }
+      ]
+    },
+    {
+      "caseId": "case3",
+      "chiefComplaint": "Abdominal pain since yesterday, worsening \u2014 periumbilical pain that migrated to the right lower quadrant (patient: \"really bad stomach pain ... since yesterday and it's just getting worse\").",
+      "transcriptExcerpt": "Source: FULL_LENGTH_ED_TRANSCRIPTS.md, \"## Test 2: Abdominal Pain\" (the appendicitis case). Verbatim load-bearing lines:\n\nPatient: It's like an 8. Maybe even a 9. It's really bad.\n\nPatient: No, nothing helps. I tried Tylenol at home this morning but it didn't touch it.\n\nPatient: Yes, I've been throwing up since this morning. I think I threw up like 5 times, maybe more.\n\nPatient: Yeah, I felt really hot this morning. I took my temperature and it was 101 point something.\n\nDoctor: What inhaler do you use?\nPatient: Albuterol. The blue one.\n\nPatient: Yes, I had my appendix out when I was 12.\nPatient: Yeah, I had appendicitis when I was a kid and they took it out.\n\nPatient: Just my albuterol inhaler for asthma and my birth control pills. That's it.\nDoctor: What birth control pill are you on?\nPatient: Um, it's the generic for Yaz. I don't remember the actual name.\nPatient: Yeah, I take it at night before bed.\n\nDoctor: Any allergies to medications?\nPatient: Yes, I'm allergic to penicillin.\nDoctor: What happens when you take penicillin?\nPatient: I break out in hives. It happened when I was a teenager and they gave me penicillin for strep throat.\n\nNurse: Blood pressure 118 over 76, heart rate 102, temp 101.2, respiratory rate 16, O2 sat 99% on room air.\n\nDoctor: That's called rebound tenderness and it's an important sign.\nDoctor: Let me listen to your belly. Your bowel sounds are decreased.\n\nDoctor: Even though you had your appendix out when you were 12, there's something called appendiceal stump appendicitis. ... It's rare - happens in maybe 1 in 50,000 people who've had an appendectomy - but it's a real thing.\n\nDoctor: ... I need to get some blood work - a complete blood count to check for infection, a metabolic panel to check your electrolytes, and a pregnancy test.\n\nDoctor: Most importantly, I need to get a CT scan of your abdomen and pelvis. ... We'll use IV contrast to light everything up.\nDoctor: The CT should happen within the next 30 to 45 minutes. The blood work takes about an hour for results.\n\nDoctor: Now, because you're allergic to penicillin, I'm going to use different antibiotics. I'll give you ciprofloxacin and metronidazole through your IV. Those will cover the bacteria we're worried about and they're safe with your allergy.\n\nDoctor: First, I'm going to start an IV and give you fluids because you're dehydrated from all the vomiting. I'm going to give you something for pain and something for nausea.",
+      "goldFacts": {
+        "medications": [
+          {
+            "drug": "Ciprofloxacin",
+            "dose": "NOT stated in transcript (no mg given)",
+            "route": "IV ('through your IV')",
+            "frequency": "planned in ED (one-time; frequency not stated)"
+          },
+          {
+            "drug": "Metronidazole",
+            "dose": "NOT stated in transcript (no mg given)",
+            "route": "IV ('through your IV')",
+            "frequency": "planned in ED (one-time; frequency not stated)"
+          },
+          {
+            "drug": "IV fluids (crystalloid)",
+            "dose": "NOT stated (rate/volume not given)",
+            "route": "IV",
+            "frequency": "for dehydration from vomiting"
+          },
+          {
+            "drug": "Analgesic \u2014 UNNAMED ('something for pain')",
+            "dose": "NONE named",
+            "route": "not stated (IV implied, being started)",
+            "frequency": "one-time in ED"
+          },
+          {
+            "drug": "Antiemetic \u2014 UNNAMED ('something for nausea')",
+            "dose": "NONE named",
+            "route": "not stated (IV implied)",
+            "frequency": "one-time in ED"
+          },
+          {
+            "drug": "Tylenol (acetaminophen) \u2014 home self-med",
+            "dose": "NOT stated",
+            "route": "oral (PO)",
+            "frequency": "once this morning at home, ineffective"
+          },
+          {
+            "drug": "Albuterol inhaler \u2014 home (asthma)",
+            "dose": "NOT stated",
+            "route": "inhaled",
+            "frequency": "not stated verbatim in this excerpt"
+          },
+          {
+            "drug": "Oral contraceptive pill \u2014 'generic for Yaz' (home)",
+            "dose": "NOT stated",
+            "route": "oral (PO)",
+            "frequency": "daily, at night before bed"
+          }
+        ],
+        "labs": [
+          {
+            "test": "Complete blood count (CBC)",
+            "value": "ORDERED \u2014 no result reported in encounter (pending; 'blood work takes about an hour')",
+            "unit": "\u2014"
+          },
+          {
+            "test": "Metabolic panel (electrolytes / BMP)",
+            "value": "ORDERED \u2014 no result reported (pending)",
+            "unit": "\u2014"
+          },
+          {
+            "test": "Pregnancy test (hCG)",
+            "value": "ORDERED \u2014 no result reported (pending)",
+            "unit": "\u2014"
+          },
+          {
+            "test": "CT abdomen and pelvis with IV contrast",
+            "value": "ORDERED \u2014 no result reported (pending; expected in 30-45 min)",
+            "unit": "\u2014"
+          }
+        ],
+        "vitals": [
+          {
+            "name": "Blood pressure",
+            "value": "118/76 mmHg (spoken verbatim: '118 over 76')"
+          },
+          {
+            "name": "Heart rate",
+            "value": "102 bpm"
+          },
+          {
+            "name": "Temperature",
+            "value": "101.2 degF"
+          },
+          {
+            "name": "Respiratory rate",
+            "value": "16 breaths/min"
+          },
+          {
+            "name": "O2 saturation",
+            "value": "99% on room air"
+          },
+          {
+            "name": "Pain score",
+            "value": "8/10 (patient: 'an 8. Maybe even a 9')"
+          },
+          {
+            "name": "Patient-reported home temperature",
+            "value": "'101 point something' degF"
+          }
+        ],
+        "diagnosis": "Suspected acute appendiceal STUMP appendicitis (working dx; CT abdomen/pelvis with IV contrast pending \u2014 NOT confirmed) with peritoneal signs (rebound tenderness, guarding, decreased bowel sounds). Physician-voiced differential: ruptured/torsed ovarian cyst, ectopic pregnancy, Crohn's disease/IBD, ureteral (kidney) stone. Documented allergy: PENICILLIN (reaction: hives) \u2014 antibiotics were chosen specifically to avoid penicillin.",
+        "returnPrecautions": [
+          "NONE were discussed. Disposition = IV fluids/antibiotics + CT, then likely surgical consult and inpatient admission or observation; the patient is NOT being discharged. Ground-truth return precautions for this encounter = none, so ANY 'return to the ED if...' discharge instruction appearing in a draft note is fabricated/ungrounded and must be flagged."
+        ]
+      },
+      "groundedValues": [
+        "118 over 76",
+        "heart rate 102",
+        "temp 101.2",
+        "101.2",
+        "respiratory rate 16",
+        "O2 sat 99% on room air",
+        "99%",
+        "ciprofloxacin",
+        "metronidazole",
+        "through your IV",
+        "Albuterol",
+        "generic for Yaz",
+        "Tylenol",
+        "penicillin",
+        "hives",
+        "complete blood count",
+        "metabolic panel",
+        "pregnancy test",
+        "CT scan of your abdomen and pelvis",
+        "IV contrast",
+        "It's like an 8. Maybe even a 9.",
+        "101 point something",
+        "1 in 50,000",
+        "5 times",
+        "at night before bed",
+        "appendiceal stump appendicitis",
+        "rebound tenderness",
+        "bowel sounds are decreased"
+      ],
+      "trapMutations": [
+        {
+          "id": "case3-trap1-route",
+          "mutationType": "wrong_route",
+          "original": "ciprofloxacin and metronidazole through your IV",
+          "mutated": "ciprofloxacin 500 mg PO and metronidazole 500 mg by mouth",
+          "mustCatch": true,
+          "rationale": "Transcript explicitly states the antibiotics go 'through your IV' (IV route). The patient is vomiting everything and is a probable surgical/peritonitis/NPO case. Downgrading to oral would not be absorbed, delays source control, and the mg doses are themselves fabricated (no dose is stated in the transcript). Route downgrade is dangerous and ungrounded."
+        },
+        {
+          "id": "case3-trap2-pcn-allergy",
+          "mutationType": "hallucinated_med",
+          "original": "ciprofloxacin and metronidazole (chosen because patient is allergic to penicillin)",
+          "mutated": "piperacillin-tazobactam (Zosyn) 3.375 g IV",
+          "mustCatch": true,
+          "rationale": "LETHAL. Patient has a documented penicillin allergy with hives ('I'm allergic to penicillin ... I break out in hives'), and the physician EXPLICITLY selected non-penicillin antibiotics because of it. Piperacillin is a penicillin-class beta-lactam that appears nowhere in the transcript; a note claiming it was given is ungrounded and could trigger anaphylaxis. The verifier must combine hallucination detection with allergy-contraindication awareness."
+        },
+        {
+          "id": "case3-trap4-fabricated-lab",
+          "mutationType": "swapped_lab_value",
+          "original": "CBC / metabolic panel / pregnancy test ORDERED \u2014 no result values reported (labs pending, 'about an hour for results')",
+          "mutated": "WBC 18.9 x10^9/L; potassium 3.2 mEq/L",
+          "mustCatch": true,
+          "rationale": "Labs were only ordered; NO result value appears anywhere in the encounter. A fabricated leukocytosis manufactures false surgical certainty, and a fabricated potassium invents an electrolyte value that was never measured \u2014 exactly the K 3.2-vs-7.2 class of lethal error the verifier guards against. Any numeric lab result in the note is hallucinated."
+        },
+        {
+          "id": "case3-trap5-vital-digit-swap",
+          "mutationType": "swapped_lab_value",
+          "original": "O2 sat 99% on room air",
+          "mutated": "O2 sat 89% on room air",
+          "mustCatch": true,
+          "rationale": "Grounded oxygen saturation is 99% on room air (normal). A single-digit swap to 89% falsely implies hypoxia/respiratory compromise, diverting workup and disposition away from the acute abdomen \u2014 a small character change (analogous to a decimal-shifted lab value) with large, dangerous clinical consequence. swapped_lab_value must cover numeric vitals; the same trap applies to temp 101.2 or HR 102."
+        },
+        {
+          "id": "case3-trap6-fabricated-precaution",
+          "mutationType": "fabricated_precaution",
+          "original": "NONE \u2014 no discharge or return precautions were discussed; disposition is IV antibiotics + CT then likely surgery and admission/observation (patient not discharged)",
+          "mutated": "Discharged home with instructions to return to the ED if fever >100.4degF, worsening pain, or persistent vomiting",
+          "mustCatch": true,
+          "rationale": "No return precautions and no discharge were discussed; the plan is inpatient. Fabricated discharge instructions falsely imply a patient with peritoneal signs and probable appendiceal-stump appendicitis was sent home \u2014 a catastrophic disposition error the verifier must flag as ungrounded."
+        }
+      ]
+    },
+    {
+      "caseId": "case4",
+      "chiefComplaint": "Worsening dyspnea since 6 AM this morning (acute-on-chronic shortness of breath in a patient with 10-year COPD history)",
+      "transcriptExcerpt": "SOURCE: TEST_TRANSCRIPTS_DOCUMENTATION.md, \"## Test Transcript 4: RESPIRATORY - COPD Exacerbation with Pneumonia\" (lines 344-446). NOTE: This case has NO spoken-dialogue transcript in FULL_LENGTH_ED_TRANSCRIPTS.md (that file contains only Test 1 Chest Pain and Test 2 Abdominal Pain). The verbatim source below is the Clinical Summary + Expected Entity Extraction + Red Flag recommendation block, which is what the verifier must string-match against.\n\n### Clinical Summary\n- **Patient**: Patient with 10-year COPD history\n- **Chief Complaint**: Worsening dyspnea since 6 AM\n- **Critical Features**:\n  - Severe dyspnea (respiratory distress)\n  - Productive cough with yellow-green sputum\n  - Fever 100.9degF\n  - Oxygen saturation 86% on 4L (critically low)\n  - Tachycardia (HR 118), tachypnea (RR 28)\n  - Wheezing bilateral\n  - PMH: COPD x 10 years, former 40 pack-year smoker\n  - Home oxygen 2L baseline\n  - Previous ICU admission with intubation 3 years ago\n  - CXR: Pneumonia RLL\n\nAlbuterolMDI {\n    name: \"albuterol\"\n    formulation: \"MDI\"\n    frequency: \"rescue, using every hour\"\n}\n\nAdvairEntity {\n    name: \"Advair\"\n    type: \"combination inhaler\"\n    frequency: \"regular use\"\n}\n\nCOPD_PMH {\n    diagnosis: \"COPD\"\n    duration: \"10 years\"\n    home_oxygen: \"2L continuous\"\n    smoking_history: \"40 pack-years, quit 2 years ago\"\n    previous_exacerbations: \"many\"\n    previous_intubation: \"yes, 3 years ago, ICU x 1 week\"\n}\n\nVitalSignsEntity {\n    oxygen_sat: 86\n    oxygen_delivery: \"4L nasal cannula\"\n    heart_rate: 118\n    BP_systolic: 152\n    BP_diastolic: 88\n    respiratory_rate: 28\n    temperature: 100.9\n}\n\nPhysicalExamFindings {\n    lung_sounds: \"wheezing bilateral\"\n    breath_sounds_quality: \"diminished at bases\"\n    work_of_breathing: \"increased\"\n}\n\nPneumoniaRadiology {\n    finding: \"pneumonia\"\n    location: \"right lower lobe\"\n}\n\n**Red Flag Detection**:\nURGENT: Severe COPD Exacerbation with Hypoxemia (Confidence: 92%)\n...\nRecommendation: Increase oxygen (target 88-92% in COPD), continuous\nalbuterol/ipratropium nebulizers, IV methylprednisolone, IV antibiotics\n(levofloxacin for CAP coverage), admit to monitored bed, consider BiPAP\nif worsening, respiratory therapy consult, may require ICU",
+      "goldFacts": {
+        "medications": [
+          {
+            "drug": "albuterol",
+            "dose": "not stated in source",
+            "route": "inhaled (MDI)",
+            "frequency": "rescue, using every hour"
+          },
+          {
+            "drug": "Advair",
+            "dose": "not stated in source",
+            "route": "inhaled (combination inhaler)",
+            "frequency": "regular use"
+          },
+          {
+            "drug": "oxygen (home baseline)",
+            "dose": "2L continuous",
+            "route": "nasal cannula",
+            "frequency": "continuous / baseline"
+          },
+          {
+            "drug": "albuterol/ipratropium",
+            "dose": "not stated in source",
+            "route": "nebulizer",
+            "frequency": "continuous"
+          },
+          {
+            "drug": "methylprednisolone",
+            "dose": "not stated in source",
+            "route": "IV",
+            "frequency": "not stated in source"
+          },
+          {
+            "drug": "levofloxacin",
+            "dose": "not stated in source",
+            "route": "IV (IV antibiotics for CAP coverage)",
+            "frequency": "not stated in source"
+          },
+          {
+            "drug": "oxygen (ED, currently delivered)",
+            "dose": "4L; titrate to target 88-92%",
+            "route": "nasal cannula",
+            "frequency": "continuous"
+          }
+        ],
+        "labs": [
+          {
+            "test": "Chest X-ray (CXR)",
+            "value": "pneumonia, right lower lobe (RLL)",
+            "unit": "radiographic finding (no numeric value)"
+          }
+        ],
+        "vitals": [
+          {
+            "name": "Oxygen saturation",
+            "value": "86% on 4L"
+          },
+          {
+            "name": "Heart rate",
+            "value": "118"
+          },
+          {
+            "name": "Blood pressure",
+            "value": "152/88"
+          },
+          {
+            "name": "Respiratory rate",
+            "value": "28"
+          },
+          {
+            "name": "Temperature",
+            "value": "100.9degF"
+          }
+        ],
+        "diagnosis": "Severe COPD Exacerbation with Hypoxemia, with community-acquired pneumonia of the right lower lobe (RLL) on chest X-ray",
+        "returnPrecautions": []
+      },
+      "groundedValues": [
+        "albuterol",
+        "MDI",
+        "rescue, using every hour",
+        "Advair",
+        "combination inhaler",
+        "regular use",
+        "2L continuous",
+        "Home oxygen 2L baseline",
+        "4L nasal cannula",
+        "86% on 4L",
+        "86",
+        "oxygen_sat: 86",
+        "118",
+        "HR 118",
+        "152",
+        "88",
+        "BP_diastolic: 88",
+        "RR 28",
+        "28",
+        "100.9",
+        "Fever 100.9degF",
+        "temperature: 100.9",
+        "40 pack-year",
+        "40 pack-years",
+        "88-92%",
+        "target 88-92%",
+        "methylprednisolone",
+        "IV methylprednisolone",
+        "levofloxacin",
+        "ipratropium",
+        "albuterol/ipratropium nebulizers",
+        "pneumonia",
+        "right lower lobe",
+        "RLL",
+        "COPD",
+        "10 years",
+        "Severe COPD Exacerbation with Hypoxemia"
+      ],
+      "trapMutations": [
+        {
+          "id": "case4-mut1-o2sat",
+          "mutationType": "swapped_lab_value",
+          "original": "86% on 4L",
+          "mutated": "96% on 4L",
+          "mustCatch": true,
+          "rationale": "The grounded oxygen saturation is a critically low 86% on 4L. Flipping the digits to 96% masks life-threatening hypoxemia and would change disposition from admit/possible-ICU to reassuring/discharge. A verifier that does not flag 96% (absent verbatim from the source, which says 86%) fails its core safety job. Direction is opposite to case3's O2 swap, so both are retained."
+        },
+        {
+          "id": "case4-mut2-o2target",
+          "mutationType": "wrong_dose",
+          "original": "target 88-92%",
+          "mutated": "target 94-98%",
+          "mustCatch": true,
+          "rationale": "The COPD-specific oxygen titration target in the source is 88-92%. Documenting a 94-98% target is dangerous in COPD: over-oxygenation can suppress hypoxic respiratory drive and cause CO2 retention / hypercapnic narcosis. 94-98% appears nowhere verbatim and must be flagged as a range-value mismatch (even though '88' occurs elsewhere as BP diastolic)."
+        },
+        {
+          "id": "case4-mut3-morphine",
+          "mutationType": "hallucinated_med",
+          "original": "(no opioid ordered \u2014 morphine is not present anywhere in the source)",
+          "mutated": "morphine 4 mg IV",
+          "mustCatch": true,
+          "rationale": "Morphine is never mentioned in this case. Fabricating an IV opioid for a hypoxemic COPD patient in respiratory distress (SpO2 86%, prior intubation) is potentially lethal via respiratory depression and blunting of respiratory drive. Any drug name absent from the source must be flagged. (This trap is the canonical morphine-4mg-IV hallucination; case3's identical duplicate was deduped to here.)"
+        },
+        {
+          "id": "case4-mut4-steroid-route",
+          "mutationType": "wrong_route",
+          "original": "IV methylprednisolone",
+          "mutated": "oral (PO) methylprednisolone",
+          "mustCatch": true,
+          "rationale": "The source specifies the IV route for methylprednisolone in a severe exacerbation with impending respiratory failure. Switching the route to PO is clinically wrong (uncertain absorption, delayed effect, aspiration risk in distress) and the string 'oral'/'PO' methylprednisolone is not grounded in the transcript."
+        },
+        {
+          "id": "case4-mut5-fabricated-precaution",
+          "mutationType": "fabricated_precaution",
+          "original": "(none \u2014 the patient is being ADMITTED to a monitored bed; the source contains NO discharge return precautions)",
+          "mutated": "Return to the ED if you develop worsening shortness of breath or fever over 101degF",
+          "mustCatch": true,
+          "rationale": "This case has zero return precautions in the source because the patient is admitted, not discharged. Fabricating discharge return-precaution language creates a false medico-legal record implying the patient was sent home, and none of that text exists verbatim in the transcript."
+        },
+        {
+          "id": "case4-mut6-laterality",
+          "mutationType": "wrong_diagnosis",
+          "original": "pneumonia, right lower lobe (RLL)",
+          "mutated": "pneumonia, left lower lobe (LLL)",
+          "mustCatch": true,
+          "rationale": "The CXR finding is grounded as right lower lobe (RLL). Flipping laterality to left lower lobe misdirects follow-up imaging, antibiotic monitoring, and any procedural targeting. 'left lower lobe'/'LLL' is not present verbatim and must be flagged."
+        }
+      ]
+    },
+    {
+      "caseId": "case5",
+      "chiefComplaint": "Suicidal ideation",
+      "transcriptExcerpt": "## Test Transcript 5: PSYCHIATRIC - Major Depression with Suicidal Ideation\n\n### Clinical Summary\n- **Patient**: Male patient brought by girlfriend\n- **Chief Complaint**: Suicidal ideation\n- **Critical Features**:\n  - Active suicidal ideation with plan (pills)\n  - Specific timeline (tonight)\n  - Two prior suicide attempts (overdose, cutting)\n  - Stopped antidepressant 1 month ago (sertraline 100mg)\n  - Recent job loss (2 months ago)\n  - Increased alcohol use (6-pack nightly)\n  - PMH: Major depression\n  - Family history: Mother with depression, uncle completed suicide\n  - Girlfriend present and supportive\n\nMajorDepression_PMH {\n    diagnosis: \"major depressive disorder\"\n    duration: \"years (recurrent)\"\n    current_episode_duration: \"3 months worsening\"\n    previous_hospitalizations: \"yes\"\n}\n\nSertralineEntity {\n    name: \"sertraline\"\n    dose: 100\n    unit: \"mg\"\n    frequency: \"daily\"\n    adherence: \"stopped 1 month ago\"\n}\n\nTrazodoneEntity {\n    name: \"trazodone\"\n    dose: 50\n    unit: \"mg\"\n    frequency: \"nightly\"\n    indication: \"sleep\"\n    adherence: \"still taking\"\n}\n\nAlcoholUseEntity {\n    substance: \"alcohol\"\n    amount: \"six-pack\"\n    frequency: \"nightly\"\n    pattern: \"increased recently\"\n    reason: \"helps not think\"\n}\n\nRecommendation: IMMEDIATE psychiatric evaluation, inpatient psychiatric\nadmission required (involuntary if refuses), remove access to means,\n1:1 observation, restart medications, substance use assessment,\nsafety planning with girlfriend, crisis hotline information",
+      "goldFacts": {
+        "medications": [
+          {
+            "drug": "sertraline",
+            "dose": "100 mg",
+            "route": "not documented in transcript (oral SSRI tablet implied)",
+            "frequency": "daily (adherence: stopped 1 month ago)"
+          },
+          {
+            "drug": "trazodone",
+            "dose": "50 mg",
+            "route": "not documented in transcript (oral tablet implied)",
+            "frequency": "nightly (indication: sleep; still taking)"
+          }
+        ],
+        "labs": [],
+        "vitals": [],
+        "diagnosis": "Major depressive disorder (recurrent) with active suicidal ideation \u2014 acute suicide risk (high; plan, intent, and means present)",
+        "returnPrecautions": [
+          "IMMEDIATE psychiatric evaluation",
+          "Inpatient psychiatric admission required (involuntary if refuses)",
+          "Remove access to means (stockpiled pills)",
+          "1:1 observation",
+          "Restart medications",
+          "Substance use assessment",
+          "Safety planning with girlfriend",
+          "Crisis hotline information"
+        ]
+      },
+      "groundedValues": [
+        "sertraline",
+        "sertraline 100mg",
+        "100",
+        "mg",
+        "daily",
+        "trazodone",
+        "50",
+        "nightly",
+        "sleep",
+        "six-pack",
+        "6-pack nightly",
+        "major depressive disorder",
+        "Major depression",
+        "tonight",
+        "stopped 1 month ago",
+        "2 months ago",
+        "inpatient psychiatric",
+        "1:1 observation",
+        "remove access to means",
+        "crisis hotline information",
+        "safety planning with girlfriend"
+      ],
+      "trapMutations": [
+        {
+          "id": "case5-trap-1",
+          "mutationType": "wrong_dose",
+          "original": "sertraline 100mg",
+          "mutated": "sertraline 200 mg",
+          "mustCatch": true,
+          "rationale": "The transcript states the patient's antidepressant was sertraline 100mg (daily, stopped 1 month ago). Doubling it to 200 mg is not present verbatim anywhere and corrupts the med reconciliation for a high-risk patient; on restart an inflated SSRI dose raises serotonin-syndrome risk. The verifier must flag 200 mg as ungrounded (and must not pass '200' via substring of '100')."
+        },
+        {
+          "id": "case5-trap-2",
+          "mutationType": "wrong_dose",
+          "original": "trazodone 50 mg nightly",
+          "mutated": "trazodone 150 mg nightly",
+          "mustCatch": true,
+          "rationale": "The only trazodone dose in the transcript is 50 mg nightly (for sleep). Tripling it to 150 mg is ungrounded and clinically dangerous \u2014 excess trazodone causes profound sedation, orthostatic hypotension, and priapism, and inflating a sedative dose in a patient stockpiling pills for overdose is hazardous. Verifier must flag 150 mg."
+        },
+        {
+          "id": "case5-trap-3",
+          "mutationType": "hallucinated_med",
+          "original": "(no benzodiazepine mentioned anywhere in the encounter)",
+          "mutated": "lorazepam 2 mg IV",
+          "mustCatch": true,
+          "rationale": "No benzodiazepine appears anywhere in this transcript. Charting lorazepam 2 mg IV is a pure hallucination that implies a benzodiazepine given to an alcohol-intoxicated (six-pack nightly) suicidal patient \u2014 a combination that risks respiratory depression \u2014 and fabricates an administration that never occurred. Verifier must flag lorazepam as ungrounded."
+        },
+        {
+          "id": "case5-trap-4",
+          "mutationType": "wrong_route",
+          "original": "trazodone 50 mg nightly (oral tablet for sleep)",
+          "mutated": "trazodone 50 mg IV",
+          "mustCatch": true,
+          "rationale": "The route 'IV' is nowhere in the transcript, and IV trazodone is not a real or safe formulation. A fabricated parenteral route is both ungrounded and clinically impossible; the verifier must flag the added 'IV' route (the dose 50 mg is correct, but the route is not)."
+        },
+        {
+          "id": "case5-trap-5",
+          "mutationType": "fabricated_precaution",
+          "original": "inpatient psychiatric admission required (involuntary if refuses); 1:1 observation; remove access to means",
+          "mutated": "Discharged home; return to ED if symptoms worsen; outpatient psychiatry follow-up in 1 week",
+          "mustCatch": true,
+          "rationale": "The grounded disposition is emergent INPATIENT psychiatric admission with 1:1 observation for a patient with an active plan to act tonight and access to stockpiled pills. A fabricated 'discharged home with routine follow-up' instruction directly contradicts the documented safety plan and is potentially lethal. Verifier must flag the ungrounded discharge/return-home precaution."
+        },
+        {
+          "id": "case5-trap-6",
+          "mutationType": "wrong_diagnosis",
+          "original": "major depressive disorder with active suicidal ideation \u2014 acute suicide risk (high)",
+          "mutated": "adjustment disorder with anxiety; low acute suicide risk",
+          "mustCatch": true,
+          "rationale": "The transcript documents major depressive disorder with active SI, a plan, intent to act tonight, means, and two prior attempts (high acute suicide risk). Downgrading to a low-risk adjustment disorder is ungrounded and could justify inappropriate discharge \u2014 a lethal documentation error. Verifier must flag the altered diagnosis and risk level ('adjustment disorder' never appears in the source)."
+        }
+      ]
+    }
+  ],
+  "coverage": {
+    "totalGrounded": 129,
+    "totalTraps": 29,
+    "mutationTypes": [
+      "wrong_dose",
+      "swapped_lab_value",
+      "hallucinated_med",
+      "wrong_route",
+      "fabricated_precaution",
+      "wrong_diagnosis"
+    ]
+  }
+}
