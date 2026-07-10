@@ -97,6 +97,10 @@ public enum CalculatorRegistry {
 
     public static let all: [ClinicalCalculator] = [
         HEARTScore(),
+        WellsPE(), PERCRule(),
+        NEXUSCSpine(), CanadianCSpine(),
+        CURB65(), AlvaradoScore(),
+        OttawaAnkle(), OttawaKnee(),
     ]
 
     public static func calculator(id: String) -> ClinicalCalculator? {
