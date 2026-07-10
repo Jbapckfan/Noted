@@ -15,6 +15,7 @@
 		FE03FE03FE03FE03FE03FE03 /* NotedCoreKit in Frameworks */ = {isa = PBXBuildFile; productRef = FE02FE02FE02FE02FE02FE02 /* NotedCoreKit */; };
 		FE13FE13FE13FE13FE13FE13 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = FE11FE11FE11FE11FE11FE11 /* MLXLLM */; };
 		FE14FE14FE14FE14FE14FE14 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = FE12FE12FE12FE12FE12FE12 /* MLXLMCommon */; };
+		FE21FE21FE21FE21FE21FE21 /* Models in Resources */ = {isa = PBXBuildFile; fileRef = FE20FE20FE20FE20FE20FE20 /* Models */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -55,6 +56,7 @@
 		D0D9F4792E7BDF8600958BCA /* NotedWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "NotedWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		D0D9F4852E7BDF8600958BCA /* NotedWatch Watch AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "NotedWatch Watch AppTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		D0D9F48F2E7BDF8600958BCA /* NotedWatch Watch AppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "NotedWatch Watch AppUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		FE20FE20FE20FE20FE20FE20 /* Models */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Models; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -154,6 +156,7 @@
 				D0D9F47A2E7BDF8600958BCA /* NotedWatch Watch App */,
 				D0D9F4882E7BDF8600958BCA /* NotedWatch Watch AppTests */,
 				D0D9F4922E7BDF8600958BCA /* NotedWatch Watch AppUITests */,
+				FE20FE20FE20FE20FE20FE20 /* Models */,
 				D037A5AE2E1ED2A10015A53E /* Products */,
 			);
 			sourceTree = "<group>";
@@ -371,6 +374,7 @@
 		D037A5AB2E1ED2A10015A53E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
+				FE21FE21FE21FE21FE21FE21 /* Models in Resources */,
 			);
 		};
 		D037A5BD2E1ED2A30015A53E /* Resources */ = {

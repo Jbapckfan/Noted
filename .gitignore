@@ -210,3 +210,4 @@ NotedCore_backups/
 # training track: generated data (regenerable via convert.py) + adapter weights
 training/data/
 training/adapters/
+Models/

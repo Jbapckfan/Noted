@@ -1,8 +1,25 @@
 # Bundling the on-device model (the "fully offline" step)
 
 NotedCore must run with **no network, ever** — audio and inference never leave the phone.
-That means the LLM ships **inside the app bundle** and is loaded from disk. The code is already
-wired for this; these are the owner steps to actually put the model there.
+That means the LLM ships **inside the app bundle** and is loaded from disk.
+
+## TL;DR — it's already wired
+
+The Xcode project now references `Models/` as a **blue folder reference** in the app's resources
+(committed), and `Models/` is gitignored (a ~1.8 GB build artifact, not source). On a fresh checkout:
+
+```sh
+sh Scripts/fetch-model.sh      # populates Models/Llama-3.2-3B-Instruct-4bit (~1.8 GB, one time)
+# then build for device — the model is copied into the .app and loaded offline.
+```
+
+A device build/install without running that first will fail (the folder reference needs `Models/` to
+exist). The manual Xcode steps below are the reference for how the folder reference was created and
+what the increased-memory entitlement is for.
+
+---
+
+The code is already wired for this; these are the owner steps to actually put the model there.
 
 ## How the code resolves the model (already done)
 
