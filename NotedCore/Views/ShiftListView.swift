@@ -199,58 +199,18 @@ struct ShiftListView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .bottom) {
+            Group {
                 if model.encounters.isEmpty {
-                    ContentUnavailableView(
-                        "No encounters yet",
-                        systemImage: "waveform",
-                        description: Text("Tap the mic to record your first encounter.")
-                    )
+                    emptyState
                 } else {
-                    List {
-                        ForEach(model.encounters, id: \.id) { encounter in
-                            NavigationLink(value: encounter.id) {
-                                EncounterRow(encounter: encounter)
-                            }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
-                                    model.delete(encounter)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                            }
-                        }
-                    }
-                    .listStyle(.plain)
-                    .safeAreaPadding(.bottom, 120)
-                }
-                recordControl
-            }
-            .safeAreaInset(edge: .top) {
-                if let banner = model.modelHost.banner {
-                    Text(banner)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, 8)
-                        .background(.thinMaterial)
+                    board
                 }
             }
             .navigationTitle("Shift")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showPaste = true
-                    } label: {
-                        Label("Paste transcript", systemImage: "doc.text.magnifyingglass")
-                    }
-                    .disabled(model.isProcessing)
-                }
-            }
+            .safeAreaInset(edge: .top) { banner }
+            .safeAreaInset(edge: .bottom) { actionDock }
             .sheet(isPresented: $showPaste) {
-                TranscriptEntryView { text in
-                    model.generateFromTranscript(text)
-                }
+                TranscriptEntryView { model.generateFromTranscript($0) }
             }
             .navigationDestination(for: UUID.self) { id in
                 if let encounter = model.encounters.first(where: { $0.id == id }) {
@@ -263,28 +223,114 @@ struct ShiftListView: View {
                 }
             }
         }
+        .tint(Theme.accent)
     }
 
-    private var recordControl: some View {
-        VStack(spacing: 8) {
-            if model.isProcessing {
-                Label("Processing on device…", systemImage: "cpu")
-                    .font(.caption).foregroundStyle(.secondary)
+    // Grouped by the clinical action each encounter needs — scannable at a glance.
+    private var board: some View {
+        List {
+            ForEach(BoardSection.allCases, id: \.self) { section in
+                let items = model.encounters.filter { BoardSection.of($0) == section }
+                if !items.isEmpty {
+                    Section(section.title) {
+                        ForEach(items, id: \.id) { encounter in
+                            NavigationLink(value: encounter.id) {
+                                EncounterRow(encounter: encounter)
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    model.delete(encounter)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                        }
+                    }
+                }
             }
-            Button(action: model.toggleRecording) {
-                Image(systemName: model.isRecording ? "stop.fill" : "mic.fill")
-                    .font(.system(size: 30, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 78, height: 78)
-                    .background(model.isRecording ? Color.red : Color.blue, in: Circle())
-                    .shadow(radius: 10, y: 4)
-            }
-            .accessibilityIdentifier("recordButton")
-            .disabled(model.isProcessing)
-            Text(model.isRecording ? "Recording — tap to stop" : "Tap to record")
-                .font(.caption).foregroundStyle(.secondary)
         }
-        .padding(.bottom, 20)
+        .listStyle(.insetGrouped)
+    }
+
+    private var emptyState: some View {
+        ContentUnavailableView {
+            Label("No encounters this shift", systemImage: "waveform")
+        } description: {
+            Text("Record at the bedside. Audio, transcripts, and notes stay on this iPhone.")
+        }
+    }
+
+    @ViewBuilder private var banner: some View {
+        if let banner = model.modelHost.banner {
+            Label(banner, systemImage: "lock.fill")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, Theme.s2)
+                .background(.thinMaterial)
+        }
+    }
+
+    // Persistent bottom dock: recording is the dominant bedside action; paste-test is subordinate.
+    private var actionDock: some View {
+        VStack(spacing: Theme.s2) {
+            if model.isProcessing {
+                Label {
+                    Text("Processing on device…")
+                } icon: {
+                    ProgressView().controlSize(.mini)
+                }
+                .font(.caption).foregroundStyle(.secondary)
+            }
+            HStack(spacing: Theme.s3) {
+                Button(action: model.toggleRecording) {
+                    Label(model.isRecording ? "Stop recording" : "Record encounter",
+                          systemImage: model.isRecording ? "stop.fill" : "mic.fill")
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity, minHeight: Theme.primaryControlHeight)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(model.isRecording ? Theme.recording : Theme.accent)
+                .accessibilityIdentifier("recordButton")
+                .disabled(model.isProcessing && !model.isRecording)
+
+                Button {
+                    showPaste = true
+                } label: {
+                    Label("Paste test", systemImage: "doc.on.clipboard")
+                        .frame(minHeight: Theme.primaryControlHeight)
+                        .padding(.horizontal, Theme.s2)
+                }
+                .buttonStyle(.bordered)
+                .tint(Theme.accent)
+                .disabled(model.isProcessing)
+            }
+        }
+        .padding(.horizontal, Theme.s4)
+        .padding(.top, Theme.s3)
+        .padding(.bottom, Theme.s2)
+        .background(.bar)
+        .overlay(alignment: .top) { Divider() }
+    }
+}
+
+/// The shift board's buckets — every encounter falls in exactly one, ordered by attention.
+private enum BoardSection: CaseIterable {
+    case needsAction, inProgress, test, completed
+
+    var title: String {
+        switch self {
+        case .needsAction: return "Needs action"
+        case .inProgress:  return "In progress"
+        case .test:        return "Test inputs"
+        case .completed:   return "Completed"
+        }
+    }
+
+    static func of(_ e: Encounter) -> BoardSection {
+        if e.phase == .signed { return .completed }
+        if e.source == .manualTest { return .test }
+        return ShiftBoard.status(for: e.phase).needsAttention ? .needsAction : .inProgress
     }
 }
 
@@ -293,51 +339,73 @@ private struct EncounterRow: View {
 
     var body: some View {
         let status = ShiftBoard.status(for: encounter.phase)
-        HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(color(for: status.badge))
-                .frame(width: 4, height: 38)
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: Theme.s3) {
+            VStack(alignment: .leading, spacing: Theme.s1) {
                 Text(encounter.chiefComplaint.isEmpty ? "New encounter" : encounter.chiefComplaint)
-                    .font(.headline).lineLimit(1)
-                HStack(spacing: 6) {
-                    Text(encounter.updatedAt, format: .dateTime.hour().minute())
-                        .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    .font(.body.weight(.semibold))
+                    .lineLimit(2)
+                HStack(spacing: Theme.s2) {
+                    Text(encounter.createdAt, format: .dateTime.hour().minute())
+                        .font(.footnote.monospacedDigit())
+                        .foregroundStyle(.secondary)
                     if encounter.source == .manualTest {
                         Text("TEST")
-                            .font(.caption2.weight(.semibold))
+                            .font(.caption2.weight(.bold))
                             .padding(.horizontal, 5).padding(.vertical, 1)
-                            .background(Color.secondary.opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
-                            .foregroundStyle(.secondary)
+                            .background(Theme.accent.opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
+                            .foregroundStyle(Theme.accent)
                     }
                 }
             }
-            Spacer()
-            ShiftRowBadge(status: status)
+            Spacer(minLength: Theme.s2)
+            StatusBadgeView(status: status)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, Theme.s1)
+        .frame(minHeight: Theme.rowMinHeight)
     }
 }
 
-private struct ShiftRowBadge: View {
+private struct StatusBadgeView: View {
     let status: EncounterStatus
-    var body: some View {
-        Text(status.label)
-            .font(.caption.weight(.medium))
-            .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(color(for: status.badge).opacity(0.15), in: Capsule())
-            .foregroundStyle(color(for: status.badge))
-    }
-}
 
-private func color(for badge: EncounterBadge) -> Color {
-    switch badge {
-    case .recording:           return .blue
-    case .working:             return .secondary
-    case .readyToSign:         return .orange
-    case .awaitingDisposition: return .orange
-    case .signed:              return .green
-    case .failed:              return .red
+    var body: some View {
+        if status.badge == .working {
+            HStack(spacing: 5) {
+                ProgressView().controlSize(.mini)
+                Text(status.label).font(.caption)
+            }
+            .foregroundStyle(.secondary)
+        } else {
+            Label(status.label, systemImage: symbol)
+                .labelStyle(.titleAndIcon)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(tint)
+                .padding(.horizontal, Theme.s2).padding(.vertical, 4)
+                .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: Theme.badgeRadius))
+        }
+    }
+
+    // "Ready to sign" is an available action, not a warning → accent, not orange.
+    private var tint: Color {
+        switch status.badge {
+        case .recording:           return Theme.recording
+        case .working:             return .secondary
+        case .readyToSign:         return Theme.accent
+        case .awaitingDisposition: return Theme.caution
+        case .signed:              return Theme.signed
+        case .failed:              return Theme.recording
+        }
+    }
+
+    private var symbol: String {
+        switch status.badge {
+        case .recording:           return "record.circle.fill"
+        case .working:             return "hourglass"
+        case .readyToSign:         return "signature"
+        case .awaitingDisposition: return "clock"
+        case .signed:              return "checkmark.seal.fill"
+        case .failed:              return "exclamationmark.circle.fill"
+        }
     }
 }
 
@@ -346,25 +414,42 @@ private func color(for badge: EncounterBadge) -> Color {
 struct TranscriptEntryView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var text = ""
+    @State private var confirmDiscard = false
     var onGenerate: (String) -> Void
 
     private var trimmed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .topLeading) {
-                TextEditor(text: $text)
-                    .font(.callout.monospaced())
-                    .textInputAutocapitalization(.sentences)
-                    .padding(12)
-                    .scrollContentBackground(.hidden)
-                if text.isEmpty {
-                    Text("Paste or type an ED transcript, then Generate to run the on-device summarizer on it — no recording needed.")
-                        .font(.callout)
+            VStack(spacing: 0) {
+                HStack {
+                    Label("TEST INPUT · ON DEVICE", systemImage: "lock.fill")
+                        .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .padding(.horizontal, 17)
-                        .padding(.vertical, 20)
-                        .allowsHitTesting(false)
+                    Spacer()
+                    PasteButton(payloadType: String.self) { strings in
+                        if let s = strings.first { text = s }
+                    }
+                    .labelStyle(.iconOnly)
+                    .buttonBorderShape(.capsule)
+                }
+                .padding(.horizontal, Theme.s4)
+                .padding(.vertical, Theme.s2)
+                Divider()
+                ZStack(alignment: .topLeading) {
+                    TextEditor(text: $text)
+                        .font(.body)
+                        .textInputAutocapitalization(.sentences)
+                        .padding(Theme.s3)
+                        .scrollContentBackground(.hidden)
+                    if text.isEmpty {
+                        Text("Paste or type an ED transcript, then Generate to run the on-device summarizer on it — no recording needed.")
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, Theme.s4)
+                            .padding(.vertical, Theme.s4 + 4)
+                            .allowsHitTesting(false)
+                    }
                 }
             }
             .background(Color(.systemBackground))
@@ -372,16 +457,28 @@ struct TranscriptEntryView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") { trimmed.isEmpty ? dismiss() : (confirmDiscard = true) }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Generate") {
-                        onGenerate(trimmed)
-                        dismiss()
-                    }
-                    .bold()
-                    .disabled(trimmed.isEmpty)
+            }
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    onGenerate(trimmed)
+                    dismiss()
+                } label: {
+                    Label("Generate note", systemImage: "doc.text")
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity, minHeight: Theme.primaryControlHeight)
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.accent)
+                .disabled(trimmed.isEmpty)
+                .padding(.horizontal, Theme.s4)
+                .padding(.vertical, Theme.s2)
+                .background(.bar)
+            }
+            .confirmationDialog("Discard this transcript?", isPresented: $confirmDiscard, titleVisibility: .visible) {
+                Button("Discard", role: .destructive) { dismiss() }
+                Button("Keep editing", role: .cancel) {}
             }
         }
     }
