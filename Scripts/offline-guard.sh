@@ -19,7 +19,10 @@ SRC="$ROOT/NotedCore"
 EXCLUDE='NotedCore_disabled_files|NotedCore_backups|/\.build/|DerivedData|\.xcodeproj'
 
 # Egress signatures. Extend if a new client sneaks in.
-PATTERNS='URLSession|URLRequest\(|\.dataTask|\.uploadTask|\.downloadTask|https?://[a-z0-9.-]+\.(com|ai|io|net|org)|api\.anthropic\.com|api\.openai\.com|api\.groq\.com|Reachability'
+#  - ModelConfiguration(id:) resolves a HuggingFace repo and DOWNLOADS on first run — the offline
+#    build must load from a local directory (ModelConfiguration(directory:)) instead, so the `id:`
+#    form is treated as egress. Also catch the swift-transformers Hub download entry points.
+PATTERNS='URLSession|URLRequest\(|\.dataTask|\.uploadTask|\.downloadTask|https?://[a-z0-9.-]+\.(com|ai|io|net|org)|api\.anthropic\.com|api\.openai\.com|api\.groq\.com|Reachability|ModelConfiguration\([[:space:]]*id:|HubApi|snapshot\(from:|hubApi'
 
 # Non-egress matches to ignore (keep TIGHT, each with a reason):
 #  - comment lines (//, ///, *): commented code does not execute
@@ -28,9 +31,18 @@ PATTERNS='URLSession|URLRequest\(|\.dataTask|\.uploadTask|\.downloadTask|https?:
 ALLOW=':[0-9]+:[[:space:]]*(//|///|\*)|sessionReachabilityDidChange|isReachable|loinc\.org|snomed\.info|hl7\.org|ucum\.org|nlm\.nih\.gov'
 
 echo "== offline-guard: scanning $SRC for network egress =="
-hits="$(grep -rInE "$PATTERNS" --include='*.swift' "$SRC" 2>/dev/null \
-        | grep -vE "$EXCLUDE" \
-        | grep -vE "$ALLOW" || true)"
+# Strip comments before matching so only LIVE code counts: `//` to end-of-line and `/* … */`
+# blocks (multi-line), preserving newlines so reported line numbers stay accurate. This stops a
+# commented-out example (e.g. a `/* HuggingFaceHub().download(...) */`) from failing the guard,
+# while still catching any egress that actually compiles.
+hits="$(
+  find "$SRC" -name '*.swift' 2>/dev/null | grep -vE "$EXCLUDE" | while IFS= read -r f; do
+    perl -0777 -pe 's{//[^\n]*}{}g; s{/\*.*?\*/}{ my $m=$&; $m =~ tr/\n//cd; $m }ges' "$f" 2>/dev/null \
+      | grep -nE "$PATTERNS" \
+      | grep -vE "$ALLOW" \
+      | sed "s|^|$f:|"
+  done || true
+)"
 
 if [ -n "$hits" ]; then
   n="$(printf '%s\n' "$hits" | grep -c . || true)"

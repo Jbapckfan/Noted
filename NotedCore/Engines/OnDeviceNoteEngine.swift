@@ -60,8 +60,9 @@ public struct OnDeviceNoteEngine: NoteEngine {
 #endif
 
 public enum NoteEngineFactory {
-    /// The default on-device base model — downloaded on first run, cached, then LoRA-adapted.
-    /// Phone-safe 3B; swap for a 7B once benchmarked on device.
+    /// The default on-device base model. Resolved to a LOCAL directory bundled in the app (folder
+    /// `Models/Llama-3.2-3B-Instruct-4bit`) — NOT downloaded. See docs/MODEL-BUNDLING.md. Phone-safe
+    /// 3B; swap for a 7B once benchmarked on device.
     public static let defaultModelID = "mlx-community/Llama-3.2-3B-Instruct-4bit"
 
     public static func make(audioDirectory: URL, modelId: String = defaultModelID) -> NoteEngine {

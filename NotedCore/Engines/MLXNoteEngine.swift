@@ -31,9 +31,10 @@ public actor MLXNoteEngine: NoteEngine {
         case insufficientMemory(freeMB: UInt64)
         case notLoaded
         case emptyGeneration
+        case modelNotBundled   // offline build: the model dir isn't in the app bundle / local path
     }
 
-    private let modelId: String                          // HuggingFace repo id OR a local model dir
+    private let modelId: String                          // a LOCAL model dir path OR a bundled resource name — NEVER a network id
     private let adapterPaths: [GenerationJobKind: String] // per-stage LoRA adapters (PR5/PR9)
     private let minFreeBytesToLoad: UInt64
     private var container: ModelContainer?
@@ -48,8 +49,8 @@ public actor MLXNoteEngine: NoteEngine {
         self.minFreeBytesToLoad = minFreeMBToLoad * 1_000_000
     }
 
-    /// Kick the model load/download early (call on launch) so the first note isn't blocked on the
-    /// ~1.8 GB first-run download. Progress is reported via ModelHost.
+    /// Load the bundled model early (call on launch) so the first note isn't blocked on the load.
+    /// There is NO network: the ~1.8 GB model ships inside the app bundle. State is via ModelHost.
     public func warmup() async {
         try? await ensureLoaded()
     }
@@ -93,21 +94,47 @@ public actor MLXNoteEngine: NoteEngine {
         MLX.GPU.set(cacheLimit: 256 * 1024 * 1024) // bound Metal cache; Metal is unavailable in sim
         #endif
 
-        await MainActor.run { ModelHost.shared.update(.downloading(0)) }
+        // OFFLINE GUARANTEE: resolve the model to a LOCAL directory (the app bundle or an explicit
+        // on-disk path). We deliberately never construct a `ModelConfiguration(id:)` — that resolves
+        // a HuggingFace repo id and downloads on first run. If the model isn't bundled we FAIL CLOSED
+        // (the composite OnDeviceNoteEngine then degrades to transcript-only) rather than phone home.
+        guard let modelDirectory = resolveLocalModelDirectory() else {
+            await MainActor.run { ModelHost.shared.update(.failed("on-device model not bundled")) }
+            throw EngineError.modelNotBundled
+        }
+
+        await MainActor.run { ModelHost.shared.update(.loadingModel) }
         do {
-            // ModelConfiguration(id:) accepts a HuggingFace repo id — first run downloads (~1.8 GB)
-            // and caches it; later runs load from cache. Progress drives the UI banner.
+            // ModelConfiguration(directory:) loads weights straight from disk — no Hub, no network.
+            // (Verify on device: this initializer exists on the pinned mlx-swift-examples rev.)
             container = try await LLMModelFactory.shared.loadContainer(
-                configuration: MLXLMCommon.ModelConfiguration(id: modelId)
-            ) { progress in
-                Task { @MainActor in ModelHost.shared.update(.downloading(progress.fractionCompleted)) }
-            }
+                configuration: MLXLMCommon.ModelConfiguration(directory: modelDirectory)
+            ) { _ in }   // local load — nothing to download
             await MainActor.run { ModelHost.shared.update(.ready) }
         } catch {
             await MainActor.run { ModelHost.shared.update(.failed(error.localizedDescription)) }
             throw error
         }
         // LoRA fusion per stage is wired in PR5/PR9; base model runs the constrained schema until then.
+    }
+
+    /// Resolve the model to a LOCAL directory ONLY — an explicit on-disk path, or a folder shipped
+    /// in the app bundle under `Models/<name>` (or `<name>`). Returns nil if it isn't present; it
+    /// NEVER falls back to a network identifier, which is what keeps the app provably offline.
+    private func resolveLocalModelDirectory() -> URL? {
+        let fm = FileManager.default
+        // 1) `modelId` is already an absolute local directory (e.g. a dev override).
+        if modelId.hasPrefix("/") {
+            var isDir: ObjCBool = false
+            if fm.fileExists(atPath: modelId, isDirectory: &isDir), isDir.boolValue {
+                return URL(fileURLWithPath: modelId, isDirectory: true)
+            }
+        }
+        // 2) A folder bundled in the app, keyed by the model's short name.
+        let name = (modelId as NSString).lastPathComponent
+        if let url = Bundle.main.url(forResource: name, withExtension: nil, subdirectory: "Models") { return url }
+        if let url = Bundle.main.url(forResource: name, withExtension: nil) { return url }
+        return nil
     }
 
     /// Release the model under memory pressure (called by the governor in PR7). Dropping the
