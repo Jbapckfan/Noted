@@ -14,6 +14,7 @@ struct EncounterDetailView: View {
     @Bindable var encounter: Encounter
     var onSign: () -> Void
     var onDictateDisposition: (() -> Void)? = nil
+    var onRegenerate: (() -> Void)? = nil
 
     var body: some View {
         Form {
@@ -43,12 +44,25 @@ struct EncounterDetailView: View {
                 .font(.body.monospaced())
             }
 
-            if let transcript = encounter.transcript, !transcript.isEmpty {
-                Section("Transcript — exactly what was heard") {
-                    Text(transcript)
-                        .font(.callout)
-                        .textSelection(.enabled)
+            Section {
+                TextEditor(text: Binding(
+                    get: { encounter.transcript ?? "" },
+                    set: { encounter.transcript = $0; encounter.updatedAt = Date() }
+                ))
+                .frame(minHeight: 140)
+                .font(.callout.monospaced())
+                if let onRegenerate {
+                    Button {
+                        onRegenerate()
+                    } label: {
+                        Label("Generate note from this transcript", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                    .disabled((encounter.transcript ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
+            } header: {
+                Text("Transcript — exactly what was heard")
+            } footer: {
+                Text("Edit the transcript and regenerate to re-run the summarizer on your changes.")
             }
 
             if encounter.dischargeClinicianText != nil || encounter.dischargePatientText != nil || encounter.phase == .dischargeDrafted {

@@ -147,6 +147,43 @@ final class ShiftViewModel {
         }
     }
 
+    /// Create an encounter directly from typed/pasted transcript text and run the summarizer
+    /// (extract → grounded note), skipping audio capture. This is the manual test path: drop in a
+    /// transcript, get the note the LLM + grounding produce from it.
+    func generateFromTranscript(_ text: String, chiefComplaint: String = "Pasted transcript") {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        Task {
+            isProcessing = true
+            defer { isProcessing = false }
+            let e = Encounter(chiefComplaint: chiefComplaint, phase: .transcribed)
+            e.transcript = trimmed
+            context.insert(e)
+            try? context.save()
+            try? GenerationQueue.enqueue(.extract, for: e, in: context)   // extract → note
+            reload()
+            await worker.drain()
+            reload()
+        }
+    }
+
+    /// Re-run the summarizer on an encounter's (possibly hand-edited) transcript. Overwrites the
+    /// prior note with a fresh extract → grounded note from the current transcript text.
+    func regenerateNote(for e: Encounter) {
+        guard let t = e.transcript, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        Task {
+            isProcessing = true
+            defer { isProcessing = false }
+            e.transition(to: .transcribed)
+            e.updatedAt = Date()
+            try? context.save()
+            try? GenerationQueue.enqueue(.extract, for: e, in: context)
+            reload()
+            await worker.drain()
+            reload()
+        }
+    }
+
     private func fetch(_ id: UUID) -> Encounter? {
         try? context.fetch(FetchDescriptor<Encounter>(predicate: #Predicate { $0.id == id })).first
     }
@@ -158,6 +195,7 @@ final class ShiftViewModel {
 
 struct ShiftListView: View {
     let model: ShiftViewModel
+    @State private var showPaste = false
 
     var body: some View {
         NavigationStack {
@@ -199,12 +237,28 @@ struct ShiftListView: View {
                 }
             }
             .navigationTitle("Shift")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showPaste = true
+                    } label: {
+                        Label("Paste transcript", systemImage: "doc.text.magnifyingglass")
+                    }
+                    .disabled(model.isProcessing)
+                }
+            }
+            .sheet(isPresented: $showPaste) {
+                TranscriptEntryView { text in
+                    model.generateFromTranscript(text)
+                }
+            }
             .navigationDestination(for: UUID.self) { id in
                 if let encounter = model.encounters.first(where: { $0.id == id }) {
                     EncounterDetailView(
                         encounter: encounter,
                         onSign: { model.sign(encounter) },
-                        onDictateDisposition: { model.dictateDisposition(for: encounter) }
+                        onDictateDisposition: { model.dictateDisposition(for: encounter) },
+                        onRegenerate: { model.regenerateNote(for: encounter) }
                     )
                 }
             }
@@ -275,5 +329,51 @@ private func color(for badge: EncounterBadge) -> Color {
     case .awaitingDisposition: return .orange
     case .signed:              return .green
     case .failed:              return .red
+    }
+}
+
+/// Drop-in test path: paste/type a transcript and push it straight to the on-device summarizer,
+/// bypassing audio capture. Lets you exercise the LLM + grounding on arbitrary transcripts.
+struct TranscriptEntryView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var text = ""
+    var onGenerate: (String) -> Void
+
+    private var trimmed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    var body: some View {
+        NavigationStack {
+            ZStack(alignment: .topLeading) {
+                TextEditor(text: $text)
+                    .font(.callout.monospaced())
+                    .textInputAutocapitalization(.sentences)
+                    .padding(12)
+                    .scrollContentBackground(.hidden)
+                if text.isEmpty {
+                    Text("Paste or type an ED transcript, then Generate to run the on-device summarizer on it — no recording needed.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 17)
+                        .padding(.vertical, 20)
+                        .allowsHitTesting(false)
+                }
+            }
+            .background(Color(.systemBackground))
+            .navigationTitle("Test transcript")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Generate") {
+                        onGenerate(trimmed)
+                        dismiss()
+                    }
+                    .bold()
+                    .disabled(trimmed.isEmpty)
+                }
+            }
+        }
     }
 }
