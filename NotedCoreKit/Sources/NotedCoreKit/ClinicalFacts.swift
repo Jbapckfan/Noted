@@ -71,20 +71,40 @@ public struct ClinicalFacts: Codable, Equatable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        chiefComplaint = try c.decodeIfPresent(String.self, forKey: .chiefComplaint)
-        hpi = try c.decodeIfPresent(String.self, forKey: .hpi)
-        reviewOfSystems = try c.decodeIfPresent(String.self, forKey: .reviewOfSystems)
-        pastMedicalHistory = try c.decodeIfPresent([String].self, forKey: .pastMedicalHistory) ?? []
-        allergies = try c.decodeIfPresent([String].self, forKey: .allergies) ?? []
-        medications = try c.decodeIfPresent([Medication].self, forKey: .medications) ?? []
-        vitals = try c.decodeIfPresent([Vital].self, forKey: .vitals) ?? []
-        physicalExam = try c.decodeIfPresent(String.self, forKey: .physicalExam)
-        labs = try c.decodeIfPresent([LabResult].self, forKey: .labs) ?? []
-        mdm = try c.decodeIfPresent(String.self, forKey: .mdm)
-        diagnosis = try c.decodeIfPresent(String.self, forKey: .diagnosis)
-        differential = try c.decodeIfPresent([String].self, forKey: .differential) ?? []
-        disposition = try c.decodeIfPresent(String.self, forKey: .disposition)
-        returnPrecautions = try c.decodeIfPresent([String].self, forKey: .returnPrecautions) ?? []
+        // TOLERANT: a small base model drifts from the schema — it emits "" or "none" for an empty
+        // list, omits keys, or wrong-types a field. The parser must NEVER throw on that (or a whole
+        // encounter fails extraction on device); it decodes what parses and defaults the rest. The
+        // grounding gate — not the parser — is what enforces correctness.
+        chiefComplaint = Self.string(c, .chiefComplaint)
+        hpi = Self.string(c, .hpi)
+        reviewOfSystems = Self.string(c, .reviewOfSystems)
+        pastMedicalHistory = Self.stringArray(c, .pastMedicalHistory)
+        allergies = Self.stringArray(c, .allergies)
+        medications = (try? c.decode([Medication].self, forKey: .medications)) ?? []
+        vitals = (try? c.decode([Vital].self, forKey: .vitals)) ?? []
+        physicalExam = Self.string(c, .physicalExam)
+        labs = (try? c.decode([LabResult].self, forKey: .labs)) ?? []
+        mdm = Self.string(c, .mdm)
+        diagnosis = Self.string(c, .diagnosis)
+        differential = Self.stringArray(c, .differential)
+        disposition = Self.string(c, .disposition)
+        returnPrecautions = Self.stringArray(c, .returnPrecautions)
+    }
+
+    private static func string(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> String? {
+        try? c.decode(String.self, forKey: key)
+    }
+
+    /// Accept a JSON array OR a bare string — the model sometimes emits `""` / `"none"` for an empty
+    /// list, or a single string for a one-item list.
+    private static func stringArray(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> [String] {
+        if let arr = try? c.decode([String].self, forKey: key) { return arr }
+        if let s = try? c.decode(String.self, forKey: key) {
+            let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+            if t.isEmpty || ["none", "none mentioned", "unknown", "n/a", "na"].contains(t.lowercased()) { return [] }
+            return [t]
+        }
+        return []
     }
 
     /// Parse from an extraction-JSON string (what `Encounter.extractionJSON` holds).

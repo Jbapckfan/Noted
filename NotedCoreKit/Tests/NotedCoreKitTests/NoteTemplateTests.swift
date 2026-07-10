@@ -54,6 +54,19 @@ final class ClinicalFactsTests: XCTestCase {
         XCTAssertTrue(facts.returnPrecautions.isEmpty)
     }
 
+    /// A small base model drifts from the schema — "" / "none" for empty lists, a bare string for a
+    /// single item. Parsing must tolerate all of it rather than throw (found by the real-LLM eval).
+    func testTolerantOfSmallModelSchemaDrift() throws {
+        let json = #"{"chief_complaint":"chest pain","allergies":"","past_medical_history":"none","medications":"none","differential":["ACS"],"return_precautions":"return if worse"}"#
+        let f = try ClinicalFacts.parse(json)
+        XCTAssertEqual(f.chiefComplaint, "chest pain")
+        XCTAssertTrue(f.allergies.isEmpty)
+        XCTAssertTrue(f.pastMedicalHistory.isEmpty)
+        XCTAssertTrue(f.medications.isEmpty)
+        XCTAssertEqual(f.differential, ["ACS"])
+        XCTAssertEqual(f.returnPrecautions, ["return if worse"])
+    }
+
     func testRoundTripsToExtractionJSONAndVerifies() throws {
         // The end-to-end contract: extractionJSON string -> facts -> verify against transcript.
         let transcript = "Gave aspirin 324 mg. Potassium 3.2."

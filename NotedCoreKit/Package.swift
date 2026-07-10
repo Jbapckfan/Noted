@@ -16,6 +16,13 @@ let package = Package(
             name: "NotedCoreKit",
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
+        // Offline eval tool: feed an LLM extraction + the transcript through the REAL grounding +
+        // template + calculator-suggestion pipeline. `swift run nc-summarize <transcript> <json>`.
+        .executableTarget(
+            name: "nc-summarize",
+            dependencies: ["NotedCoreKit"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
         .testTarget(
             name: "NotedCoreKitTests",
             dependencies: ["NotedCoreKit"],

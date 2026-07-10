@@ -1,0 +1,10 @@
+Doctor: Good morning. What's going on?
+Patient: I've had a cough for five days and now I'm having trouble breathing. I've been coughing up green stuff.
+Doctor: Any fever?
+Patient: Yeah, I felt hot and had chills last night.
+Doctor: How old are you?
+Patient: Seventy-one.
+Doctor: Any medical problems?
+Patient: I have COPD and diabetes.
+Doctor: Let me check your numbers. Your temperature is 101.8, your breathing rate is 32, your blood pressure is 104 over 64, and your oxygen is 89 percent on room air. Your chest X-ray shows a right lower lobe pneumonia. We're going to start you on ceftriaxone 1 gram IV and azithromycin. Given your age and how hard you're working to breathe, we're going to admit you to the hospital.
+Patient: Okay, whatever you think is best.

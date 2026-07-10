@@ -1,0 +1,10 @@
+Doctor: Hi there, what happened today?
+Patient: I rolled my ankle playing basketball about an hour ago. The outside of my ankle really hurts.
+Doctor: Can you walk on it?
+Patient: I tried but it hurts too much to put weight on it. I could only take a couple of steps.
+Doctor: Let me feel. Is it tender right here, on the back of the outer ankle bone?
+Patient: Yeah, right there. Ow.
+Doctor: Any numbness or tingling in the foot?
+Patient: No, none of that.
+Doctor: Okay. There's tenderness over the lateral malleolus and you can't bear weight, so we're going to get an X-ray of the ankle to make sure it isn't broken. I'll give you ibuprofen 600 milligrams by mouth for the pain.
+Patient: Sounds good, thanks.

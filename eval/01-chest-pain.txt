@@ -1,0 +1,16 @@
+Doctor: Hi, I'm Dr. Alford. What brings you in today?
+Patient: I've been having chest pain for about two hours. It started when I was mowing the lawn.
+Doctor: Can you describe the pain?
+Patient: It's like a pressure, right in the middle of my chest. It goes into my left arm a little.
+Doctor: On a scale of one to ten?
+Patient: About a seven.
+Doctor: Any shortness of breath, sweating, or nausea?
+Patient: Yeah, I got sweaty and a little short of breath.
+Doctor: Do you have any medical problems?
+Patient: High blood pressure and high cholesterol. I smoke about a pack a day.
+Doctor: Any family history of heart disease?
+Patient: My dad had a heart attack at fifty-five.
+Doctor: How old are you?
+Patient: I'm sixty-two.
+Doctor: Okay. Your blood pressure is 158 over 92 and your heart rate is 96. We gave you aspirin 324 milligrams to chew. Your EKG shows some nonspecific changes. The first troponin came back at 0.03, which is right at the upper limit. We're going to keep you for observation and repeat the troponin in a few hours.
+Patient: Okay, thank you.
