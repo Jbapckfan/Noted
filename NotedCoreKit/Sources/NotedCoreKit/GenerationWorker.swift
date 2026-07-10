@@ -161,6 +161,7 @@ public actor GenerationWorker {
         let (grounded, report) = GroundingVerifier(transcript: e.transcript ?? "").filtered(parsed)
         e.noteText = NoteTemplate.renderHPIandMDM(grounded, removed: report.flags)
         e.verificationReport = Self.encode(report)
+        e.noteEditedAfterGrounding = false   // a fresh draft is, by definition, unedited since grounding
     }
 
     /// `.dischargeRender`: verified discharge JSON -> clinician + patient renderings, cross-layer

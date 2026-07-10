@@ -50,6 +50,27 @@ final class PipelineIntegrationTests: XCTestCase {
         XCTAssertTrue(report.contains("ungroundedMedication"), "morphine (not in transcript) flagged: \(report)")
     }
 
+    /// A manual-test encounter keeps its source, and a freshly generated note clears the
+    /// "edited after grounding" flag (the grounding check applies to the new draft).
+    func testManualTestNoteGenerationClearsEditedFlag() async throws {
+        let container = try tempStore()
+        let ctx = ModelContext(container)
+        let e = Encounter(chiefComplaint: "chest pain", phase: .transcribed, source: .manualTest)
+        e.transcript = "Doctor: I'm going to give you some aspirin to chew."
+        e.noteEditedAfterGrounding = true   // pretend a prior draft was hand-edited
+        ctx.insert(e)
+        try GenerationQueue.enqueue(.extract, for: e, in: ctx)
+
+        let extraction = #"{"chief_complaint":"chest pain","medications":[{"drug":"aspirin"}]}"#
+        let worker = GenerationWorker(container: container, engine: StubEngine(extraction: extraction))
+        _ = await worker.drain()
+
+        let reloaded = try ModelContext(container).fetch(FetchDescriptor<Encounter>()).first
+        XCTAssertEqual(reloaded?.source, .manualTest, "source persists")
+        XCTAssertNotNil(reloaded?.noteText)
+        XCTAssertEqual(reloaded?.noteEditedAfterGrounding, false, "a freshly generated draft is unedited since grounding")
+    }
+
     /// The discharge-render stage produces BOTH renderings from the verified discharge JSON, and
     /// the patient version expands abbreviations.
     func testDischargeRenderStageProducesBothRenderings() async throws {

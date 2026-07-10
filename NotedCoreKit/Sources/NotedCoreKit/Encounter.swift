@@ -1,6 +1,14 @@
 import Foundation
 import SwiftData
 
+/// How an encounter's source text was produced — so the UI can treat a bedside recording (whose
+/// transcript is fixed source material) differently from a pasted test transcript (which the tester
+/// edits and re-summarizes). Inferring this forever from `audioFileRelPath` is fragile.
+public enum EncounterSource: String, Codable, Sendable, CaseIterable {
+    case audio        // recorded + transcribed at the bedside — the transcript is read-only source
+    case manualTest   // a transcript pasted/typed to exercise the summarizer — editable + re-runnable
+}
+
 /// One patient encounter — the durable unit of work.
 ///
 /// Everything is committed to disk the moment it changes, so seeing 3 patients in a
@@ -24,6 +32,9 @@ public final class Encounter {
     /// Stored raw phase; use the `phase` computed accessor.
     public var phaseRaw: String
 
+    /// Stored raw source; use the `source` computed accessor. Defaulted so existing rows migrate.
+    public var sourceRaw: String = EncounterSource.audio.rawValue
+
     // MARK: Capture
     /// Path RELATIVE to the app's audio directory (never an absolute URL — absolute
     /// paths break when the app container is relocated on restore/reinstall).
@@ -35,6 +46,9 @@ public final class Encounter {
     public var extractionJSON: String?
     public var noteText: String?
     public var verificationReport: String?
+    /// True once the clinician edits the note AFTER it was generated: the grounding check applied to
+    /// the generated draft, not to later edits, so the UI must say so. Defaulted for row migration.
+    public var noteEditedAfterGrounding: Bool = false
 
     // MARK: Disposition + discharge (the second generative task)
     public var dispositionAudioRelPath: String?
@@ -56,6 +70,7 @@ public final class Encounter {
         id: UUID = UUID(),
         chiefComplaint: String = "",
         phase: EncounterPhase = .recording,
+        source: EncounterSource = .audio,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -63,6 +78,8 @@ public final class Encounter {
         self.updatedAt = createdAt
         self.chiefComplaint = chiefComplaint
         self.phaseRaw = phase.rawValue
+        self.sourceRaw = source.rawValue
+        self.noteEditedAfterGrounding = false
         self.audioFileRelPath = nil
         self.recordingDuration = 0
         self.jobs = []
@@ -75,6 +92,12 @@ public final class Encounter {
             phaseRaw = newValue.rawValue
             updatedAt = Date()
         }
+    }
+
+    /// Typed source accessor.
+    public var source: EncounterSource {
+        get { EncounterSource(rawValue: sourceRaw) ?? .audio }
+        set { sourceRaw = newValue.rawValue }
     }
 
     /// Advance the phase and touch `updatedAt` in one call.

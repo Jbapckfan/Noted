@@ -156,7 +156,7 @@ final class ShiftViewModel {
         Task {
             isProcessing = true
             defer { isProcessing = false }
-            let e = Encounter(chiefComplaint: chiefComplaint, phase: .transcribed)
+            let e = Encounter(chiefComplaint: chiefComplaint, phase: .transcribed, source: .manualTest)
             e.transcript = trimmed
             context.insert(e)
             try? context.save()
@@ -268,7 +268,7 @@ struct ShiftListView: View {
     private var recordControl: some View {
         VStack(spacing: 8) {
             if model.isProcessing {
-                Label("Generating note…", systemImage: "sparkles")
+                Label("Processing on device…", systemImage: "cpu")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Button(action: model.toggleRecording) {
@@ -300,8 +300,17 @@ private struct EncounterRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(encounter.chiefComplaint.isEmpty ? "New encounter" : encounter.chiefComplaint)
                     .font(.headline).lineLimit(1)
-                Text(encounter.updatedAt, format: .dateTime.hour().minute())
-                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Text(encounter.updatedAt, format: .dateTime.hour().minute())
+                        .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    if encounter.source == .manualTest {
+                        Text("TEST")
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 5).padding(.vertical, 1)
+                            .background(Color.secondary.opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             Spacer()
             ShiftRowBadge(status: status)
